@@ -80,9 +80,13 @@ def admin_required(f):
         if not current_user.is_authenticated or not current_user.is_admin:
             log_security_event('unauthorized_admin_access_attempt', 'User attempted to access admin area')
             abort(403)
-        if current_app.config['ADMIN_2FA_REQUIRED'] and not verify_2fa():
-            log_security_event('2fa_verification_failed', 'Admin 2FA verification failed')
-            abort(403)
+        if current_app.config.get('ADMIN_2FA_REQUIRED'):
+            # Obtener token de formulario o header
+            token = request.form.get('totp_token') or request.headers.get('X-TOTP-Token')
+            user_secret = getattr(current_user, 'totp_secret', None)
+            if not token or not user_secret or not verify_2fa(token, user_secret):
+                log_security_event('2fa_verification_failed', 'Admin 2FA verification failed')
+                abort(403)
         return f(*args, **kwargs)
     return decorated_function
 

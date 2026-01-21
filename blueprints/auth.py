@@ -49,33 +49,26 @@ class RegisterForm(FlaskForm):
 def login():
     """Página de inicio de sesión"""
     if current_user.is_authenticated:
-        print("Usuario ya autenticado, redirigiendo a index")
         return redirect(url_for('shop.index'))
 
     form = LoginForm()
     if form.validate_on_submit():
-        print(f"Intentando login con usuario: {form.username.data}")
         user = User.query.filter_by(username=form.username.data).first()
 
         if user:
-            print(f"Usuario encontrado: {user.username}")
             if user.check_password(form.password.data):
-                print("Contraseña correcta, iniciando sesión")
                 user.last_login = datetime.now()
                 db.session.commit()
 
                 if login_user(user, remember=True):
-                    print("Login exitoso")
                     flash('¡Bienvenido de nuevo!', 'success')
                     return redirect(url_for('shop.index'))
                 else:
-                    print("Error en login_user")
+                    current_app.logger.error(f"Error en login_user para usuario {user.id}")
                     flash('Error al iniciar sesión', 'error')
             else:
-                print("Contraseña incorrecta")
                 flash('Contraseña incorrecta', 'error')
         else:
-            print("Usuario no encontrado")
             flash('Usuario no encontrado', 'error')
 
     return render_template('login.html', form=form)

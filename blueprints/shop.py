@@ -218,9 +218,12 @@ def basic_search():
         toys_query = toys_query.order_by(Toy.price.desc())
     else:  # fallback
         toys_query = toys_query.order_by(Toy.created_at.desc())
-    
-    # Obtener todos los resultados sin paginación para garantizar que se muestren todos los juguetes
-    toys = toys_query.all()
+
+    # Paginación para evitar cargar todos los resultados en memoria
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 12, type=int)
+    toys_pagination = toys_query.paginate(page=page, per_page=per_page, error_out=False)
+    toys = toys_pagination.items
     
     # Obtener categorÃ­as para filtros
     categories = db.session.query(Toy.category).filter(
@@ -241,7 +244,8 @@ def basic_search():
         sort=sort,
         categories=category_list,
         center_choices=center_choices,
-        selected_center=selected_center
+        selected_center=selected_center,
+        pagination=toys_pagination
     )
 
 @shop_bp.route('/search/suggestions')
@@ -383,10 +387,10 @@ def add_to_session_cart(toy_id, quantity, toy_name, show_flash_message=True):
 @shop_bp.route('/cart')
 @login_required
 def view_cart():
-    """Ver carrito con datos del cache o sesiÃ³n"""
+    """Ver carrito con datos del cache o sesión - optimizado para evitar N+1 queries"""
     cart_items = []
     total = 0
-    
+
     if ADVANCED_SYSTEMS_AVAILABLE and current_user.is_authenticated:
         # Intentar obtener del cache
         try:
@@ -399,29 +403,34 @@ def view_cart():
             cart = session.get('cart', {})
     else:
         cart = session.get('cart', {})
-    
-    for toy_id, item in cart.items():
-        toy = Toy.query.get(int(toy_id))
-        if toy and toy.is_active:
-            # Asegurar que item es un diccionario
-            if isinstance(item, dict):
-                quantity = item.get('quantity', 1)
-                price = item.get('price', toy.price)
-            else:
-                # Formato antiguo - item es solo la cantidad
-                quantity = item
-                price = toy.price
-            
-            item_total = float(price) * quantity
-            cart_items.append({
-                'toy': toy,
-                'quantity': quantity,
-                'total': item_total
-            })
-            total += item_total
-    
-    return render_template('cart.html', 
-                         cart_items=cart_items, 
+
+    # Optimización: obtener todos los juguetes en una sola query
+    if cart:
+        toy_ids = [int(tid) for tid in cart.keys()]
+        toys = {t.id: t for t in Toy.query.filter(Toy.id.in_(toy_ids), Toy.is_active == True).all()}
+
+        for toy_id, item in cart.items():
+            toy = toys.get(int(toy_id))
+            if toy:
+                # Asegurar que item es un diccionario
+                if isinstance(item, dict):
+                    quantity = item.get('quantity', 1)
+                    price = item.get('price', toy.price)
+                else:
+                    # Formato antiguo - item es solo la cantidad
+                    quantity = item
+                    price = toy.price
+
+                item_total = float(price) * quantity
+                cart_items.append({
+                    'toy': toy,
+                    'quantity': quantity,
+                    'total': item_total
+                })
+                total += item_total
+
+    return render_template('cart.html',
+                         cart_items=cart_items,
                          total=total,
                          format_currency=format_currency)
 
@@ -451,7 +460,7 @@ def remove_from_cart(toy_id):
         return jsonify({'success': False, 'message': 'Producto no encontrado en el carrito'})
         
     except Exception as e:
-        print(f"Error al eliminar del carrito: {str(e)}")
+        current_app.logger.error(f"Error al eliminar del carrito: {str(e)}")
         return jsonify({'success': False, 'message': 'Error al eliminar del carrito'})
 
 @shop_bp.route('/update_cart/<int:toy_id>', methods=['POST'])
@@ -493,7 +502,7 @@ def update_cart(toy_id):
         return jsonify({'success': False, 'message': 'Producto no encontrado en el carrito'})
         
     except Exception as e:
-        print(f"Error al actualizar carrito: {str(e)}")
+        current_app.logger.error(f"Error al actualizar carrito: {str(e)}")
         return jsonify({'success': False, 'message': 'Error al actualizar el carrito'})
 
 @shop_bp.route('/checkout', methods=['GET', 'POST'])
@@ -511,14 +520,18 @@ def checkout():
         flash('Tu carrito está vacío', 'error')
         return redirect(url_for('shop.view_cart'))
 
-    # Calcular total y obtener items del carrito
+    # Calcular total y obtener items del carrito - optimizado para evitar N+1 queries
     cart_items = []
     total = 0
 
     try:
-        if 'cart' in session:
+        if 'cart' in session and session['cart']:
+            # Obtener todos los juguetes en una sola query
+            toy_ids = [int(tid) for tid in session['cart'].keys()]
+            toys = {t.id: t for t in Toy.query.filter(Toy.id.in_(toy_ids)).all()}
+
             for toy_id, item in session['cart'].items():
-                toy = Toy.query.get(int(toy_id))
+                toy = toys.get(int(toy_id))
                 if toy:
                     subtotal = item['quantity'] * item['price']
                     cart_items.append({
@@ -529,7 +542,7 @@ def checkout():
                     })
                     total += subtotal
     except Exception as e:
-        print(f"Error al cargar el carrito: {str(e)}")
+        current_app.logger.error(f"Error al cargar el carrito: {str(e)}")
         flash('Error al cargar el carrito', 'error')
         return redirect(url_for('shop.view_cart'))
 
@@ -600,7 +613,6 @@ def checkout():
 
                 # Actualizar stock del juguete
                 toy.stock -= item['quantity']
-                print(f"Stock actualizado para {toy.name}: {toy.stock + item['quantity']} -> {toy.stock}")
 
             # Actualizar balance del usuario
             current_user.balance -= discounted_total
@@ -620,9 +632,8 @@ def checkout():
 
         except Exception as e:
             db.session.rollback()
-            error_msg = f"Error al procesar la compra: {str(e)}"
-            print(error_msg)
-            flash(error_msg, 'error')
+            current_app.logger.error(f"Error al procesar la compra: {str(e)}")
+            flash(f"Error al procesar la compra: {str(e)}", 'error')
             return redirect(url_for('shop.view_cart'))
 
     # Para GET, mostrar la página de checkout
@@ -633,10 +644,6 @@ def checkout():
                          discount_amount=discount_amount,
                          discounted_total=discounted_total,
                          center_discount=center_record)
-
-def format_currency(amount):
-    """Formatea un monto como moneda"""
-    return f"A$ {amount:,.2f}"
 
 def generate_pdf(order):
     """Genera un PDF con el recibo de la orden"""
@@ -652,7 +659,6 @@ def generate_pdf(order):
     
     buffer = None
     try:
-        print(f"Iniciando generaciÃ³n de PDF para orden {order.id}")
         
         # Crear buffer y documento
         buffer = io.BytesIO()
@@ -703,10 +709,9 @@ def generate_pdf(order):
             # Determinar las fuentes a usar (Futura si estÃ¡ disponible, sino Helvetica por defecto)
             font_name_normal = 'Futura' if 'Futura' in pdfmetrics.getRegisteredFontNames() else 'Helvetica'
             font_name_bold = 'Futura-Bold' if 'Futura-Bold' in pdfmetrics.getRegisteredFontNames() else 'Helvetica-Bold'
-            print(f"Usando fuentes: Normal='{font_name_normal}', Bold='{font_name_bold}'")
 
         except Exception as e:
-            print(f"Error al registrar fuentes Futura: {e}. Se usarÃ¡n fuentes por defecto.")
+            current_app.logger.warning(f"Error al registrar fuentes Futura: {e}. Se usarán fuentes por defecto.")
             font_name_normal = 'Helvetica'
             font_name_bold = 'Helvetica-Bold'
 
@@ -750,9 +755,10 @@ def generate_pdf(order):
                 elements.append(aloha_logo)
                 elements.append(Spacer(1, 12))
             except Exception as e:
-                print(f"Error al cargar el logo: {e}")
+                current_app.logger.warning(f"Error al cargar el logo: {e}")
+                elements.append(Paragraph("Tiendita ALOHA", styles["Title"]))
         else:
-            print(f"Advertencia: Logo no encontrado en {LOGO_PATH}")
+            current_app.logger.warning(f"Logo no encontrado en {LOGO_PATH}")
             elements.append(Paragraph("Tiendita ALOHA", styles["Title"]))
 
         elements.append(Paragraph("Recibo de Compra", styles["Subtitle"]))
@@ -884,23 +890,19 @@ def generate_pdf(order):
 
         for line in footer_lines:
             elements.append(Paragraph(line, styles["Center"]))
-        
+
         # Generar PDF
-        print("Construyendo documento PDF...")
         doc.build(elements)
-        
+
         # Obtener el PDF generado
         pdf = buffer.getvalue()
         if not pdf:
-            raise ValueError("No se pudo generar el PDF: el buffer estÃ¡ vacÃ­o")
-            
-        print(f"PDF generado exitosamente, tamaÃ±o: {len(pdf)} bytes")
+            raise ValueError("No se pudo generar el PDF: el buffer está vacío")
+
         return pdf
-        
+
     except Exception as e:
-        print(f"Error al generar el PDF: {str(e)}")
-        import traceback
-        traceback.print_exc()
+        current_app.logger.error(f"Error al generar el PDF: {str(e)}")
         raise
     finally:
         if buffer:
@@ -914,39 +916,30 @@ def generate_pdf(order):
 def download_receipt(order_id):
     """Descargar recibo en PDF"""
     try:
-        print(f"\n=== Inicio de generaciÃ³n de PDF para orden {order_id} ===")
-        print(f"Usuario actual: {current_user.id} (Admin: {current_user.is_admin})")
-        
         # Obtener la orden
         order = Order.query.get_or_404(order_id)
-        print(f"Orden encontrada: ID={order.id}, Usuario={order.user_id}, Total={order.total_price}")
-        
+
         # Verificar permisos
         if order.user_id != current_user.id and not current_user.is_admin:
-            print(f"Error de permisos: Usuario {current_user.id} intentando acceder a orden de usuario {order.user_id}")
             flash('No tienes permiso para ver esta orden', 'error')
             return redirect(url_for('shop.index'))
-        
-        # Generar PDF
-        print("Iniciando generaciÃ³n de PDF...")
+
         try:
             # Verificar si la orden tiene items
             if not order.items:
                 raise ValueError("La orden no contiene items")
-                
-            # Verificar que los precios sean vÃ¡lidos
+
+            # Verificar que los precios sean válidos
             for item in order.items:
                 if item.price is None or item.quantity is None:
-                    raise ValueError(f"Item {item.id} tiene precio o cantidad invÃ¡lidos")
-            
+                    raise ValueError(f"Item {item.id} tiene precio o cantidad inválidos")
+
             # Generar el PDF
             pdf = generate_pdf(order)
-            
+
             if not pdf:
-                raise ValueError("El PDF generado estÃ¡ vacÃ­o")
-                
-            print(f"PDF generado exitosamente, tamaÃ±o: {len(pdf)} bytes")
-            
+                raise ValueError("El PDF generado está vacío")
+
             # Crear respuesta con buffer
             response = make_response(pdf)
             response.mimetype = 'application/pdf'
@@ -955,59 +948,43 @@ def download_receipt(order_id):
             response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
             response.headers['Pragma'] = 'no-cache'
             response.headers['Expires'] = '0'
-            
-            print("Respuesta preparada correctamente")
+
             return response
-            
+
         except Exception as e:
-            print(f"\n!!! Error durante la generaciÃ³n del PDF:")
-            print(f"Tipo de error: {type(e).__name__}")
-            print(f"Mensaje: {str(e)}")
-            print("\nTraceback completo:")
-            import traceback
-            traceback.print_exc()
-            
+            current_app.logger.error(f"Error al generar PDF para orden {order_id}: {type(e).__name__} - {str(e)}")
             flash(f'Error al generar el PDF: {str(e)}', 'error')
             return redirect(url_for('shop.order_summary', order_id=order_id))
-            
+
     except Exception as e:
-        print(f"\n!!! Error en la ruta download_receipt:")
-        print(f"Tipo de error: {type(e).__name__}")
-        print(f"Mensaje: {str(e)}")
-        print("\nTraceback completo:")
-        import traceback
-        traceback.print_exc()
-        
-        flash('Error al procesar la solicitud. Por favor intente nuevamente mÃ¡s tarde.', 'error')
+        current_app.logger.error(f"Error en download_receipt para orden {order_id}: {type(e).__name__} - {str(e)}")
+        flash('Error al procesar la solicitud. Por favor intente nuevamente más tarde.', 'error')
         return redirect(url_for('shop.order_summary', order_id=order_id))
 
 @shop_bp.route('/order/<int:order_id>')
 @login_required
 def order_summary(order_id):
-    """Ver resumen de una orden especÃ­fica"""
+    """Ver resumen de una orden específica"""
     try:
         order = Order.query.get_or_404(order_id)
-        
+
         # Verificar permisos
         if order.user_id != current_user.id and not current_user.is_admin:
             flash('No tienes permiso para ver esta orden', 'error')
             return redirect(url_for('shop.index'))
-        
+
         # Verificar que la orden tenga items
         if not order.items:
             flash('La orden no contiene items', 'error')
             return redirect(url_for('shop.index'))
-        
-        # Registrar visualizaciÃ³n de la orden
-        print(f"Visualizando orden #{order_id} por usuario {current_user.username}")
-        
-        # Pasar la funciÃ³n format_currency al contexto de la plantilla
-        return render_template('order_summary.html', 
+
+        # Pasar la función format_currency al contexto de la plantilla
+        return render_template('order_summary.html',
                              order=order,
                              format_currency=format_currency)
     except Exception as e:
-        print(f"Error al cargar la orden {order_id}: {str(e)}")
-        flash('OcurriÃ³ un error al cargar la orden', 'error')
+        current_app.logger.error(f"Error al cargar la orden {order_id}: {str(e)}")
+        flash('Ocurrió un error al cargar la orden', 'error')
         return redirect(url_for('shop.index'))
 
 

@@ -13,3 +13,9 @@ pyotp
 reportlab
 python-dotenv
 email-validator>=2.2.0
+gunicorn
+
+# Testing dependencies
+pytest>=7.0
+pytest-cov>=3.0
+pytest-flask>=1.2

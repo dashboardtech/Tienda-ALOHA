@@ -42,7 +42,10 @@ class User(UserMixin, db.Model):
     profile_pic = db.Column(db.String(120))
     is_active = db.Column(db.Boolean, default=True)
     
-    __table_args__ = (CheckConstraint('balance >= 0'),)
+    __table_args__ = (
+        CheckConstraint('balance >= 0'),
+        db.Index('idx_user_active_created', 'is_active', 'created_at'),
+    )
     
     # Relaciones
     orders = db.relationship('Order', backref='user', lazy='select', cascade='all, delete-orphan')
@@ -118,11 +121,13 @@ class Order(db.Model):
         CheckConstraint('discount_percentage >= 0'),
         CheckConstraint('discounted_total >= 0'),
         CheckConstraint('total_price >= 0'),
+        db.Index('idx_order_active_date', 'is_active', 'order_date'),
+        db.Index('idx_order_user_date', 'user_id', 'order_date'),
     )
 
 class OrderItem(db.Model):
     __tablename__ = 'order_item'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     order_id = db.Column(db.Integer, db.ForeignKey('order.id', ondelete='CASCADE'), nullable=False)
     toy_id = db.Column(db.Integer, db.ForeignKey('toy.id', ondelete='CASCADE'), nullable=False)
@@ -131,8 +136,11 @@ class OrderItem(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.now)
     updated_at = db.Column(db.DateTime, onupdate=datetime.now)
     is_active = db.Column(db.Boolean, default=True)
-    
-    __table_args__ = (CheckConstraint('quantity > 0'),)
+
+    __table_args__ = (
+        CheckConstraint('quantity > 0'),
+        db.Index('idx_orderitem_order_toy', 'order_id', 'toy_id'),
+    )
 
 
 class ToyCenterAvailability(db.Model):

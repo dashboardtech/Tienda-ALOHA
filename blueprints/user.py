@@ -63,25 +63,44 @@ def add_balance():
         
     except Exception as e:
         db.session.rollback()
-        print(f"Error al agregar balance: {str(e)}")
+        current_app.logger.error(f"Error al agregar balance: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 400
+
+def validate_password_strength(password):
+    """Valida que la contraseña cumpla con los requisitos de seguridad."""
+    if len(password) < 8:
+        return False, "La contraseña debe tener al menos 8 caracteres"
+    if not any(c.isupper() for c in password):
+        return False, "La contraseña debe contener al menos una letra mayúscula"
+    if not any(c.islower() for c in password):
+        return False, "La contraseña debe contener al menos una letra minúscula"
+    if not any(c.isdigit() for c in password):
+        return False, "La contraseña debe contener al menos un número"
+    return True, "Contraseña válida"
+
 
 @user_bp.route('/change_password', methods=['POST'])
 @login_required
 def change_password():
-    """Cambiar contraseña del usuario"""
+    """Cambiar contraseña del usuario con validación de fortaleza."""
     current_password = request.form.get('current_password')
     new_password = request.form.get('new_password')
     confirm_password = request.form.get('confirm_password')
-    
+
     if not current_user.check_password(current_password):
         flash('Contraseña actual incorrecta', 'error')
         return redirect(url_for('user.profile'))
-    
+
     if new_password != confirm_password:
         flash('Las contraseñas nuevas no coinciden', 'error')
         return redirect(url_for('user.profile'))
-    
+
+    # Validar fortaleza de la contraseña
+    is_valid, message = validate_password_strength(new_password)
+    if not is_valid:
+        flash(message, 'error')
+        return redirect(url_for('user.profile'))
+
     current_user.set_password(new_password)
     db.session.commit()
     flash('Contraseña actualizada correctamente', 'success')
