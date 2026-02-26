@@ -143,7 +143,7 @@ def create_app(config_class=None):
         app.task_queue = rq.Queue('aloha-tasks', connection=app.redis)
         cache.init_app(app, config={'CACHE_TYPE': 'redis', 'CACHE_REDIS_URL': app.config['REDIS_URL']})
     except Exception as e:
-        print("⚠️ No Redis; usando SimpleCache:", e)
+        app.logger.info("No Redis available; using SimpleCache")
         app.redis = None
         app.task_queue = None
         cache.init_app(app, config={'CACHE_TYPE': 'SimpleCache'})
@@ -164,7 +164,6 @@ def create_app(config_class=None):
 
         # exigir autenticación
         if not current_user.is_authenticated:
-            print(f"Usuario no autenticado intentando acceder a: {request.endpoint}")
             return redirect(url_for('auth.login'))
 
         # actualizar timestamp de sesión
@@ -273,35 +272,6 @@ def create_app(config_class=None):
         log_security_event('bad_request', getattr(e, "description", "Bad request"))
         return "Bad request.", 400
 
-    # -------- Ruta de prueba de CSP (opcional, solo dev) --------
-    @app.route('/test_csp')
-    def test_csp():
-        resp = app.make_response("""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Test CSP</title>
-            <meta http-equiv="Content-Security-Policy"
-                  content="default-src 'self' 'unsafe-inline' 'unsafe-eval'; img-src 'self' data:; style-src 'self' 'unsafe-inline';">
-            <script>
-                document.addEventListener('DOMContentLoaded', function() {
-                    console.log('Script ejecutado correctamente');
-                    document.body.innerHTML += '<p>Script ejecutado correctamente</p>';
-                });
-            </script>
-        </head>
-        <body>
-            <h1>Prueba de CSP</h1>
-            <p>Si ves este mensaje, la página se cargó correctamente.</p>
-            <button onclick="alert('¡Hola!')">Haz clic aquí</button>
-        </body>
-        </html>
-        """)
-        resp.headers['Content-Security-Policy'] = (
-            "default-src 'self' 'unsafe-inline' 'unsafe-eval'; img-src 'self' data:; style-src 'self' 'unsafe-inline';"
-        )
-        return resp
-
     # Crear tablas si no existen (desarrollo)
     with app.app_context():
         db.create_all()
@@ -320,11 +290,5 @@ def create_app(config_class=None):
         except Exception:
             # Ignorar si no aplica (primera creación o SQLite limitado)
             pass
-
-    # Debug: ver a qué DB apunta
-    try:
-        print(f"DEBUG: SQLALCHEMY_DATABASE_URI = {app.config['SQLALCHEMY_DATABASE_URI']}")
-    except Exception:
-        pass
 
     return app

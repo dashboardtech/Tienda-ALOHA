@@ -2,10 +2,9 @@ import os
 from datetime import timedelta
 
 class Config:
-    # Security Keys - moved to environment variables
-    SECRET_KEY = os.environ.get('SECRET_KEY') or os.urandom(32)
-    CSRF_SECRET_KEY = os.environ.get('CSRF_SECRET_KEY') or os.urandom(32)
-    DATABASE_URL = os.environ.get('DATABASE_URL') or 'sqlite:////Users/frobertsv./CascadeProjects/ALOHA Tienda 2025/tienditas-aloha-app-2/tiendita.db'
+    # Security Keys - MUST be set in environment
+    SECRET_KEY = os.environ.get('SECRET_KEY', os.urandom(32))
+    CSRF_SECRET_KEY = os.environ.get('CSRF_SECRET_KEY', os.urandom(32))
     REDIS_URL = os.environ.get('REDIS_URL') or 'redis://localhost:6379/0'
     
     # Session Security

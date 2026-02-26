@@ -400,18 +400,20 @@ def view_cart():
     else:
         cart = session.get('cart', {})
     
+    # Batch load all toys in one query instead of N+1
+    toy_ids = [int(tid) for tid in cart.keys()]
+    toys_by_id = {t.id: t for t in Toy.query.filter(Toy.id.in_(toy_ids)).all()} if toy_ids else {}
+
     for toy_id, item in cart.items():
-        toy = Toy.query.get(int(toy_id))
+        toy = toys_by_id.get(int(toy_id))
         if toy and toy.is_active:
-            # Asegurar que item es un diccionario
             if isinstance(item, dict):
                 quantity = item.get('quantity', 1)
                 price = item.get('price', toy.price)
             else:
-                # Formato antiguo - item es solo la cantidad
                 quantity = item
                 price = toy.price
-            
+
             item_total = float(price) * quantity
             cart_items.append({
                 'toy': toy,
@@ -451,7 +453,7 @@ def remove_from_cart(toy_id):
         return jsonify({'success': False, 'message': 'Producto no encontrado en el carrito'})
         
     except Exception as e:
-        print(f"Error al eliminar del carrito: {str(e)}")
+        current_app.logger.warning(f"Error al eliminar del carrito: {e}")
         return jsonify({'success': False, 'message': 'Error al eliminar del carrito'})
 
 @shop_bp.route('/update_cart/<int:toy_id>', methods=['POST'])
@@ -493,7 +495,7 @@ def update_cart(toy_id):
         return jsonify({'success': False, 'message': 'Producto no encontrado en el carrito'})
         
     except Exception as e:
-        print(f"Error al actualizar carrito: {str(e)}")
+        current_app.logger.warning(f"Error al actualizar carrito: {e}")
         return jsonify({'success': False, 'message': 'Error al actualizar el carrito'})
 
 @shop_bp.route('/checkout', methods=['GET', 'POST'])
@@ -517,8 +519,12 @@ def checkout():
 
     try:
         if 'cart' in session:
+            # Batch load all toys in one query
+            toy_ids = [int(tid) for tid in session['cart'].keys()]
+            toys_by_id = {t.id: t for t in Toy.query.filter(Toy.id.in_(toy_ids)).all()} if toy_ids else {}
+
             for toy_id, item in session['cart'].items():
-                toy = Toy.query.get(int(toy_id))
+                toy = toys_by_id.get(int(toy_id))
                 if toy:
                     subtotal = item['quantity'] * item['price']
                     cart_items.append({
@@ -529,7 +535,7 @@ def checkout():
                     })
                     total += subtotal
     except Exception as e:
-        print(f"Error al cargar el carrito: {str(e)}")
+        current_app.logger.error(f"Error al cargar el carrito: {e}")
         flash('Error al cargar el carrito', 'error')
         return redirect(url_for('shop.view_cart'))
 
@@ -600,7 +606,7 @@ def checkout():
 
                 # Actualizar stock del juguete
                 toy.stock -= item['quantity']
-                print(f"Stock actualizado para {toy.name}: {toy.stock + item['quantity']} -> {toy.stock}")
+                current_app.logger.debug(f"Stock actualizado para {toy.name}: {toy.stock + item['quantity']} -> {toy.stock}")
 
             # Actualizar balance del usuario
             current_user.balance -= discounted_total
@@ -620,9 +626,8 @@ def checkout():
 
         except Exception as e:
             db.session.rollback()
-            error_msg = f"Error al procesar la compra: {str(e)}"
-            print(error_msg)
-            flash(error_msg, 'error')
+            current_app.logger.error(f"Checkout failed for user {current_user.id}: {e}", exc_info=True)
+            flash('Error al procesar la compra. Por favor intenta de nuevo.', 'error')
             return redirect(url_for('shop.view_cart'))
 
     # Para GET, mostrar la página de checkout
@@ -652,7 +657,7 @@ def generate_pdf(order):
     
     buffer = None
     try:
-        print(f"Iniciando generaciÃ³n de PDF para orden {order.id}")
+        current_app.logger.debug(f"Iniciando generacion de PDF para orden {order.id}")
         
         # Crear buffer y documento
         buffer = io.BytesIO()
@@ -703,10 +708,10 @@ def generate_pdf(order):
             # Determinar las fuentes a usar (Futura si estÃ¡ disponible, sino Helvetica por defecto)
             font_name_normal = 'Futura' if 'Futura' in pdfmetrics.getRegisteredFontNames() else 'Helvetica'
             font_name_bold = 'Futura-Bold' if 'Futura-Bold' in pdfmetrics.getRegisteredFontNames() else 'Helvetica-Bold'
-            print(f"Usando fuentes: Normal='{font_name_normal}', Bold='{font_name_bold}'")
+            current_app.logger.debug(f"Usando fuentes: Normal='{font_name_normal}', Bold='{font_name_bold}'")
 
         except Exception as e:
-            print(f"Error al registrar fuentes Futura: {e}. Se usarÃ¡n fuentes por defecto.")
+            current_app.logger.debug(f"Error al registrar fuentes Futura: {e}. Se usaran fuentes por defecto.")
             font_name_normal = 'Helvetica'
             font_name_bold = 'Helvetica-Bold'
 
@@ -750,9 +755,9 @@ def generate_pdf(order):
                 elements.append(aloha_logo)
                 elements.append(Spacer(1, 12))
             except Exception as e:
-                print(f"Error al cargar el logo: {e}")
+                current_app.logger.debug(f"Error al cargar el logo: {e}")
         else:
-            print(f"Advertencia: Logo no encontrado en {LOGO_PATH}")
+            current_app.logger.debug(f"Advertencia: Logo no encontrado en {LOGO_PATH}")
             elements.append(Paragraph("Tiendita ALOHA", styles["Title"]))
 
         elements.append(Paragraph("Recibo de Compra", styles["Subtitle"]))
@@ -886,7 +891,7 @@ def generate_pdf(order):
             elements.append(Paragraph(line, styles["Center"]))
         
         # Generar PDF
-        print("Construyendo documento PDF...")
+        current_app.logger.debug("Construyendo documento PDF...")
         doc.build(elements)
         
         # Obtener el PDF generado
@@ -894,13 +899,11 @@ def generate_pdf(order):
         if not pdf:
             raise ValueError("No se pudo generar el PDF: el buffer estÃ¡ vacÃ­o")
             
-        print(f"PDF generado exitosamente, tamaÃ±o: {len(pdf)} bytes")
+        current_app.logger.debug(f"PDF generado exitosamente, tamanio: {len(pdf)} bytes")
         return pdf
-        
+
     except Exception as e:
-        print(f"Error al generar el PDF: {str(e)}")
-        import traceback
-        traceback.print_exc()
+        current_app.logger.error(f"Error al generar el PDF: {e}", exc_info=True)
         raise
     finally:
         if buffer:
@@ -914,21 +917,21 @@ def generate_pdf(order):
 def download_receipt(order_id):
     """Descargar recibo en PDF"""
     try:
-        print(f"\n=== Inicio de generaciÃ³n de PDF para orden {order_id} ===")
-        print(f"Usuario actual: {current_user.id} (Admin: {current_user.is_admin})")
-        
+        current_app.logger.debug(f"=== Inicio de generacion de PDF para orden {order_id} ===")
+        current_app.logger.debug(f"Usuario actual: {current_user.id} (Admin: {current_user.is_admin})")
+
         # Obtener la orden
         order = Order.query.get_or_404(order_id)
-        print(f"Orden encontrada: ID={order.id}, Usuario={order.user_id}, Total={order.total_price}")
-        
+        current_app.logger.debug(f"Orden encontrada: ID={order.id}, Usuario={order.user_id}, Total={order.total_price}")
+
         # Verificar permisos
         if order.user_id != current_user.id and not current_user.is_admin:
-            print(f"Error de permisos: Usuario {current_user.id} intentando acceder a orden de usuario {order.user_id}")
+            current_app.logger.debug(f"Error de permisos: Usuario {current_user.id} intentando acceder a orden de usuario {order.user_id}")
             flash('No tienes permiso para ver esta orden', 'error')
             return redirect(url_for('shop.index'))
         
         # Generar PDF
-        print("Iniciando generaciÃ³n de PDF...")
+        current_app.logger.debug("Iniciando generacion de PDF...")
         try:
             # Verificar si la orden tiene items
             if not order.items:
@@ -945,8 +948,8 @@ def download_receipt(order_id):
             if not pdf:
                 raise ValueError("El PDF generado estÃ¡ vacÃ­o")
                 
-            print(f"PDF generado exitosamente, tamaÃ±o: {len(pdf)} bytes")
-            
+            current_app.logger.debug(f"PDF generado exitosamente, tamanio: {len(pdf)} bytes")
+
             # Crear respuesta con buffer
             response = make_response(pdf)
             response.mimetype = 'application/pdf'
@@ -956,29 +959,17 @@ def download_receipt(order_id):
             response.headers['Pragma'] = 'no-cache'
             response.headers['Expires'] = '0'
             
-            print("Respuesta preparada correctamente")
+            current_app.logger.debug("Respuesta preparada correctamente")
             return response
             
         except Exception as e:
-            print(f"\n!!! Error durante la generaciÃ³n del PDF:")
-            print(f"Tipo de error: {type(e).__name__}")
-            print(f"Mensaje: {str(e)}")
-            print("\nTraceback completo:")
-            import traceback
-            traceback.print_exc()
-            
-            flash(f'Error al generar el PDF: {str(e)}', 'error')
+            current_app.logger.error(f"Error generando PDF para orden {order_id}: {e}", exc_info=True)
+            flash('Error al generar el recibo. Intente nuevamente.', 'error')
             return redirect(url_for('shop.order_summary', order_id=order_id))
             
     except Exception as e:
-        print(f"\n!!! Error en la ruta download_receipt:")
-        print(f"Tipo de error: {type(e).__name__}")
-        print(f"Mensaje: {str(e)}")
-        print("\nTraceback completo:")
-        import traceback
-        traceback.print_exc()
-        
-        flash('Error al procesar la solicitud. Por favor intente nuevamente mÃ¡s tarde.', 'error')
+        current_app.logger.error(f"Error en download_receipt para orden {order_id}: {e}", exc_info=True)
+        flash('Error al procesar la solicitud. Por favor intente nuevamente.', 'error')
         return redirect(url_for('shop.order_summary', order_id=order_id))
 
 @shop_bp.route('/order/<int:order_id>')
@@ -999,31 +990,13 @@ def order_summary(order_id):
             return redirect(url_for('shop.index'))
         
         # Registrar visualizaciÃ³n de la orden
-        print(f"Visualizando orden #{order_id} por usuario {current_user.username}")
+        current_app.logger.debug(f"Visualizando orden #{order_id} por usuario {current_user.username}")
         
         # Pasar la funciÃ³n format_currency al contexto de la plantilla
         return render_template('order_summary.html', 
                              order=order,
                              format_currency=format_currency)
     except Exception as e:
-        print(f"Error al cargar la orden {order_id}: {str(e)}")
+        current_app.logger.error(f"Error al cargar la orden {order_id}: {e}")
         flash('OcurriÃ³ un error al cargar la orden', 'error')
         return redirect(url_for('shop.index'))
-
-
-@shop_bp.route('/api/debug/session')
-@login_required
-def debug_session():
-    """Endpoint temporal para debug de sesiÃ³n"""
-    import json
-    from flask import jsonify
-    
-    session_data = {
-        'user_id': current_user.id if current_user.is_authenticated else None,
-        'username': current_user.username if current_user.is_authenticated else None,
-        'cart': session.get('cart', {}),
-        'cart_count': sum(item.get('quantity', 0) for item in session.get('cart', {}).values()) if isinstance(session.get('cart', {}), dict) else 0,
-        'session_keys': list(session.keys())
-    }
-    
-    return jsonify(session_data)
