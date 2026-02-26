@@ -79,7 +79,10 @@ class Toy(db.Model):
     deleted_at = db.Column(db.DateTime, nullable=True)
     is_active = db.Column(db.Boolean, default=True)
     
-    __table_args__ = (CheckConstraint('price > 0'),)
+    __table_args__ = (
+        CheckConstraint('price > 0'),
+        db.Index('idx_toy_catalog_filter', 'is_active', 'category', 'age_range'),
+    )
     
     # Relaciones
     order_items = db.relationship('OrderItem', backref='toy', lazy=True)
@@ -118,6 +121,7 @@ class Order(db.Model):
         CheckConstraint('discount_percentage >= 0'),
         CheckConstraint('discounted_total >= 0'),
         CheckConstraint('total_price >= 0'),
+        db.Index('idx_order_active_date', 'is_active', 'order_date'),
     )
 
 class OrderItem(db.Model):

@@ -20,6 +20,7 @@ from app.forms import ToyForm, AddUserForm, EditUserForm
 from pagination_helpers import PaginationHelper, paginate_query
 from utils import normalize_email
 from app.utils.centers import collect_center_choices, normalize_center_slug
+from app import cache
 
 # 💾 Importar Sistema de Backup Simplificado
 try:
@@ -76,6 +77,8 @@ def dashboard():
     
     # Obtener estadísticas optimizadas con cache
     sales_stats = get_dashboard_stats_optimized()
+    if sales_stats.get('error'):
+        flash('Error al cargar estadísticas', 'error')
 
     # Resumen de usuarios
     total_users = User.query.count()
@@ -104,7 +107,7 @@ def dashboard():
                 # Cachear por 5 minutos
                 DashboardCache.set_stats(inventory_data, ttl=300)
         except Exception as e:
-            print(f"⚠️ Error en sistema de inventario: {str(e)}")
+            current_app.logger.warning(f"Error en sistema de inventario: {e}")
             inventory_data = {'error': 'Sistema de inventario no disponible'}
     
     # Obtener órdenes recientes (usa índice idx_order_active_date)
@@ -148,16 +151,9 @@ def dashboard():
                          admins_count=admins_count,
                          inactive_count=inactive_count)
 
+@cache.cached(timeout=300, key_prefix='dashboard_stats')
 def get_dashboard_stats_optimized():
-    """Obtener estadísticas con caché manual (5 min)"""
-    from flask import current_app
-    cache = current_app.extensions.get('cache')
-
-    if cache:
-        cached = cache.get('dashboard_stats')
-        if cached:
-            return cached
-
+    """Obtener estadísticas del dashboard (cached 5min)"""
     sales_stats = {
         'total_sales': 0,
         'total_orders': 0,
@@ -203,16 +199,10 @@ def get_dashboard_stats_optimized():
         ]
         
     except Exception as e:
-        print(f"Error al obtener estadísticas: {str(e)}")
-        flash('Error al cargar estadísticas', 'error')
-    
-    # Guardar en caché durante 5 min (si el backend lo permite)
-    if cache:
-        if hasattr(cache, 'set'):
-            cache.set('dashboard_stats', sales_stats, timeout=300)
-        elif isinstance(cache, dict):
-            cache['dashboard_stats'] = sales_stats
-    
+        current_app.logger.error(f"Error al obtener estadisticas: {e}")
+        cache.delete('dashboard_stats')
+        sales_stats['error'] = True
+
     return sales_stats
 
 
@@ -486,8 +476,9 @@ def centers_admin():
     )
 
 
+@cache.cached(timeout=300, key_prefix='sales_chart_7d')
 def get_sales_chart_data():
-    """Obtener datos para el gráfico de ventas de los últimos 7 días"""
+    """Obtener datos para el gráfico de ventas de los últimos 7 días (cached 5min)"""
     dates = []
     sales_data = []
 
@@ -511,10 +502,11 @@ def get_sales_chart_data():
         sales_data.reverse()
         
     except Exception as e:
-        print(f"Error al obtener datos del gráfico: {str(e)}")
+        current_app.logger.error(f"Error al obtener datos del grafico: {e}")
+        cache.delete('sales_chart_7d')
         dates = ['Sin datos'] * 7
         sales_data = [0] * 7
-    
+
     return {'dates': dates, 'sales_data': sales_data}
 
 
@@ -832,9 +824,9 @@ def bulk_upload_toys():
             reader = list(csv.DictReader(csv_stream))
         except Exception as e:
             flash(f'Error al procesar el CSV: {e}', 'error')
-            print(f'❌ Error procesando CSV: {e}', flush=True)
+            current_app.logger.error(f'Error procesando CSV: {e}')
             return redirect(url_for('admin.bulk_upload_toys'))
-        print(f'Iniciando carga masiva desde CSV: {len(reader)} filas', flush=True)
+        current_app.logger.info(f'Iniciando carga masiva desde CSV: {len(reader)} filas')
 
         created = 0
         errors = []
@@ -843,10 +835,10 @@ def bulk_upload_toys():
             name = data.get('name')
             if not name:
                 error_msg = f'❌ Fila {idx} sin nombre, omitida'
-                print(error_msg, flush=True)
+                current_app.logger.debug(error_msg)
                 errors.append(error_msg)
                 continue
-            print(f'[{idx}/{len(reader)}] Procesando: {name}', flush=True)
+            current_app.logger.debug(f'[{idx}/{len(reader)}] Procesando: {name}')
             try:
                 try:
                     price = float(data.get('price', 0) or 0)
@@ -886,18 +878,18 @@ def bulk_upload_toys():
                         db.session.commit()
 
                 created += 1
-                print(f'✔️ Fila {idx} procesada: {name}', flush=True)
+                current_app.logger.debug(f'Fila {idx} procesada: {name}')
             except Exception as e:
                 db.session.rollback()
                 error_msg = f'❌ Error en fila {idx} ({name}): {e}'
-                print(error_msg, flush=True)
+                current_app.logger.warning(error_msg)
                 errors.append(error_msg)
 
         for err in errors:
             flash(err, 'error')
         flash(f'{created} juguetes cargados exitosamente. {len(errors)} errores.',
               'success' if not errors else 'warning')
-        print(f'Carga masiva completada: {created} éxitos, {len(errors)} errores', flush=True)
+        current_app.logger.info(f'Carga masiva completada: {created} exitos, {len(errors)} errores')
         return redirect(url_for('admin.toys_page'))
 
     return render_template('bulk_upload_toys.html')

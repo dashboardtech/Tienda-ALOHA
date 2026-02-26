@@ -39,32 +39,37 @@ def profile():
 @user_bp.route('/add_balance', methods=['POST'])
 @login_required
 def add_balance():
-    """Agregar balance al usuario"""
-    if not request.form.get('csrf_token'):
-        return jsonify({'success': False, 'message': 'CSRF token missing'}), 400
-        
+    """Agregar balance al usuario - solo administradores pueden agregar balance"""
+    if not current_user.is_admin:
+        return jsonify({'success': False, 'message': 'Solo administradores pueden agregar balance'}), 403
+
     try:
+        user_id = request.form.get('user_id', current_user.id, type=int)
+        target_user = User.query.get(user_id) if current_user.is_admin else current_user
+        if not target_user:
+            return jsonify({'success': False, 'message': 'Usuario no encontrado'}), 404
+
         amount = float(request.form.get('amount', 0))
         if amount <= 0:
             return jsonify({'success': False, 'message': 'Cantidad inválida'}), 400
-            
-        current_user.balance += amount
+
+        target_user.balance += amount
         db.session.commit()
         
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return jsonify({
                 'success': True,
-                'message': f'Se agregaron A$ {amount:.2f} a tu balance',
-                'new_balance': f"A$ {current_user.balance:.2f}"
+                'message': f'Se agregaron A$ {amount:.2f} al balance de {target_user.username}',
+                'new_balance': f"A$ {target_user.balance:.2f}"
             })
-            
-        flash(f'Se agregaron A$ {amount:.2f} a tu balance', 'success')
+
+        flash(f'Se agregaron A$ {amount:.2f} al balance de {target_user.username}', 'success')
         return redirect(url_for('user.profile'))
-        
+
     except Exception as e:
         db.session.rollback()
-        print(f"Error al agregar balance: {str(e)}")
-        return jsonify({'success': False, 'message': str(e)}), 400
+        current_app.logger.error(f"Error al agregar balance: {e}")
+        return jsonify({'success': False, 'message': 'Error al procesar la operación'}), 400
 
 @user_bp.route('/change_password', methods=['POST'])
 @login_required
