@@ -93,10 +93,12 @@ def advanced_search():
     """BÃºsqueda avanzada con motor inteligente"""
     try:
         # Obtener parÃ¡metros de bÃºsqueda
-        query = request.args.get('query', '').strip()
+        query = request.args.get('query', '').strip()[:200]
         sort_by = request.args.get('sort', 'relevance')
-        page = int(request.args.get('page', 1))
-        per_page = int(request.args.get('per_page', 12))
+        if sort_by not in ('relevance', 'price', 'name', 'newest', 'price_asc', 'price_desc'):
+            sort_by = 'relevance'
+        page = max(1, int(request.args.get('page', 1)))
+        per_page = min(48, max(1, int(request.args.get('per_page', 12))))
         
         # Construir filtros
         filters = {}
@@ -111,9 +113,9 @@ def advanced_search():
         if request.args.get('gender'):
             filters['gender'] = request.args.get('gender')
         if request.args.get('price_min'):
-            filters['price_min'] = float(request.args.get('price_min'))
+            filters['price_min'] = max(0, float(request.args.get('price_min')))
         if request.args.get('price_max'):
-            filters['price_max'] = float(request.args.get('price_max'))
+            filters['price_max'] = min(99999, max(0, float(request.args.get('price_max'))))
         if request.args.get('in_stock') == 'true':
             filters['in_stock'] = True
         if request.args.get('on_sale') == 'true':
@@ -273,8 +275,12 @@ def search_suggestions():
 def add_to_cart():
     """Agregar juguete al carrito con cache persistente"""
     toy_id = request.form.get('toy_id')
-    quantity = int(request.form.get('quantity', 1))
-    
+    try:
+        quantity = int(request.form.get('quantity', 1))
+    except (ValueError, TypeError):
+        quantity = 1
+    quantity = max(1, min(quantity, 100))
+
     if not toy_id:
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return jsonify({'success': False, 'message': 'Juguete no especificado'})
@@ -472,8 +478,9 @@ def update_cart(toy_id):
     
     try:
         quantity = int(request.form.get('quantity', 1))
+        quantity = max(0, min(quantity, 100))
         toy_id_str = str(toy_id)
-        
+
         if quantity < 1:
             if toy_id_str in session['cart']:
                 del session['cart'][toy_id_str]
@@ -488,6 +495,13 @@ def update_cart(toy_id):
                 })
         else:
             if toy_id_str in session['cart']:
+                # Validate against current stock
+                toy = Toy.query.get(toy_id)
+                if toy and quantity > toy.stock:
+                    return jsonify({
+                        'success': False,
+                        'message': f'Solo hay {toy.stock} unidades disponibles'
+                    }), 400
                 session['cart'][toy_id_str]['quantity'] = quantity
                 session.modified = True
                 cart = session['cart']
@@ -574,54 +588,71 @@ def checkout():
         center_record = None
 
     if request.method == 'POST':
-        # Verificar balance
-        if current_user.balance < discounted_total:
-            flash('No tienes suficientes ALOHA Dollars', 'error')
-            return redirect(url_for('shop.view_cart'))
-
         try:
-            # Crear la orden
+            # Lock user row FIRST to prevent concurrent overspending
+            user = User.query.with_for_update().get(current_user.id)
+
+            # Lock toys and recalculate totals from locked prices (TOCTOU protection)
+            actual_subtotal = Decimal('0.00')
+            order_items_data = []
+
+            for toy_id, item in session['cart'].items():
+                toy = Toy.query.with_for_update().get(int(toy_id))
+                if not toy or not toy.is_active:
+                    raise Exception(f"Juguete con ID {toy_id} ya no está disponible")
+
+                qty = item['quantity']
+                if qty < 1:
+                    raise Exception(f"Cantidad inválida para {toy.name}")
+                if toy.stock < qty:
+                    raise Exception(f"Stock insuficiente para {toy.name}. Disponible: {toy.stock}, Solicitado: {qty}")
+
+                locked_price = Decimal(str(toy.price))
+                actual_subtotal += locked_price * qty
+                order_items_data.append((toy, qty, locked_price))
+
+            actual_subtotal = actual_subtotal.quantize(Decimal('0.01'))
+
+            # Recalculate discount from locked prices
+            actual_discount_amount = Decimal('0.00')
+            if center_record and discount_percentage > 0:
+                actual_discount_amount = (actual_subtotal * discount_percentage / Decimal('100')).quantize(Decimal('0.01'))
+                if actual_discount_amount > actual_subtotal:
+                    actual_discount_amount = actual_subtotal
+            actual_total = (actual_subtotal - actual_discount_amount).quantize(Decimal('0.01'))
+
+            # Verify balance against recalculated total
+            if user.balance < actual_total:
+                flash('No tienes suficientes ALOHA Dollars', 'error')
+                return redirect(url_for('shop.view_cart'))
+
+            # Create order with consistent locked-price totals
             order = Order(
                 user_id=current_user.id,
-                subtotal_price=subtotal,
+                subtotal_price=actual_subtotal,
                 discount_percentage=discount_percentage,
-                discount_amount=discount_amount,
-                discounted_total=discounted_total,
+                discount_amount=actual_discount_amount,
+                discounted_total=actual_total,
                 discount_center=center_record.slug if center_record else None,
-                total_price=discounted_total,
+                total_price=actual_total,
                 order_date=datetime.now(timezone.utc),
                 status='completada'
             )
             db.session.add(order)
 
-            # Agregar items a la orden y actualizar stock
-            for toy_id, item in session['cart'].items():
-                # Obtener el juguete con bloqueo para evitar condiciones de carrera
-                toy = Toy.query.with_for_update().get(int(toy_id))
-                if not toy:
-                    raise Exception(f"Juguete con ID {toy_id} no encontrado")
-
-                # Verificar stock disponible
-                if toy.stock < item['quantity']:
-                    raise Exception(f"Stock insuficiente para {toy.name}. Disponible: {toy.stock}, Solicitado: {item['quantity']}")
-
-                # Crear item de orden — use DB price, never session price
+            for toy, qty, locked_price in order_items_data:
                 order_item = OrderItem(
                     order=order,
-                    toy_id=int(toy_id),
-                    quantity=item['quantity'],
-                    price=toy.price
+                    toy_id=toy.id,
+                    quantity=qty,
+                    price=locked_price
                 )
                 db.session.add(order_item)
+                toy.stock -= qty
 
-                # Actualizar stock del juguete
-                toy.stock -= item['quantity']
-                current_app.logger.debug(f"Stock actualizado para {toy.name}: {toy.stock + item['quantity']} -> {toy.stock}")
+            # Deduct from locked user row
+            user.balance -= actual_total
 
-            # Actualizar balance del usuario
-            current_user.balance -= discounted_total
-
-            # Guardar cambios
             db.session.commit()
 
             # Guardar el último order_id en sesión para manejar reenvíos accidentales

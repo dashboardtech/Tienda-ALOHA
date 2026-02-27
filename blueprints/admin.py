@@ -1578,7 +1578,7 @@ def bulk_users_action():
                 user.is_active = False
                 affected += 1
         elif action == 'delete':
-            db.session.delete(user)
+            user.is_active = False
             affected += 1
 
     try:
