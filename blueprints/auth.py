@@ -72,8 +72,12 @@ def login():
             user.last_login = datetime.now(timezone.utc)
             db.session.commit()
 
+            # Regenerate session to prevent session fixation
+            session.clear()
+
             remember = bool(request.form.get('remember'))
             if login_user(user, remember=remember):
+                session.permanent = bool(remember)
                 flash('¡Bienvenido de nuevo!', 'success')
                 return redirect(url_for('shop.index'))
             else:
