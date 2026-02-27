@@ -73,18 +73,6 @@ def secure_headers():
     """Retorna headers de seguridad para las respuestas"""
     return current_app.config['SECURITY_HEADERS']
 
-def admin_required(f):
-    """Decorador para rutas que requieren acceso de administrador"""
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not current_user.is_authenticated or not current_user.is_admin:
-            log_security_event('unauthorized_admin_access_attempt', 'User attempted to access admin area')
-            abort(403)
-        if current_app.config['ADMIN_2FA_REQUIRED'] and not verify_2fa():
-            log_security_event('2fa_verification_failed', 'Admin 2FA verification failed')
-            abort(403)
-        return f(*args, **kwargs)
-    return decorated_function
 
 def generate_2fa_secret():
     """Genera un secreto para autenticación de dos factores"""

@@ -187,10 +187,12 @@ def create_app(config_class=None):
         # Cabeceras de seguridad
         headers = secure_headers()
 
-        # CSP relajada para permitir inline en este proyecto
+        # CSP: allow inline styles/scripts but block code evaluation
         headers['Content-Security-Policy'] = (
-            "default-src 'self' 'unsafe-inline' 'unsafe-eval'; "
-            "img-src 'self' data:; style-src 'self' 'unsafe-inline';"
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data:;"
         )
         for k, v in headers.items():
             response.headers[k] = v
@@ -250,6 +252,10 @@ def create_app(config_class=None):
 
     @app.context_processor
     def inject_centers():
+        # Cache center data for 5 minutes to avoid 2 DB queries per request
+        cached = cache.get('ctx_centers')
+        if cached is not None:
+            return cached
         try:
             centers = models.Center.query.order_by(models.Center.name.asc()).all()
         except Exception:
@@ -259,11 +265,13 @@ def create_app(config_class=None):
         except Exception:
             center_choices = []
             centers_map = {}
-        return {
+        result = {
             'all_centers': centers,
             'center_choices': center_choices,
             'centers_by_slug': centers_map,
         }
+        cache.set('ctx_centers', result, timeout=300)
+        return result
 
     # -------- Manejadores de error --------
     # Mantén los tuyos existentes y añade 400 que usabas en app/app.py

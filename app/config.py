@@ -1,10 +1,27 @@
 import os
 from datetime import timedelta
 
+def _get_persistent_key(env_var, filename):
+    """Get a secret key from env, file, or generate and persist one."""
+    key = os.environ.get(env_var)
+    if key:
+        return key
+    key_file = os.path.join(os.path.dirname(__file__), '..', 'instance', filename)
+    key_file = os.path.abspath(key_file)
+    if os.path.exists(key_file):
+        with open(key_file, 'rb') as f:
+            return f.read()
+    key = os.urandom(32)
+    os.makedirs(os.path.dirname(key_file), exist_ok=True)
+    with open(key_file, 'wb') as f:
+        f.write(key)
+    return key
+
+
 class Config:
-    # Security Keys - MUST be set in environment
-    SECRET_KEY = os.environ.get('SECRET_KEY', os.urandom(32))
-    CSRF_SECRET_KEY = os.environ.get('CSRF_SECRET_KEY', os.urandom(32))
+    # Security Keys - persistent across restarts
+    SECRET_KEY = _get_persistent_key('SECRET_KEY', '.secret_key')
+    CSRF_SECRET_KEY = _get_persistent_key('CSRF_SECRET_KEY', '.csrf_secret_key')
     REDIS_URL = os.environ.get('REDIS_URL') or 'redis://localhost:6379/0'
     
     # Session Security
@@ -59,7 +76,7 @@ class Config:
         'X-Content-Type-Options': 'nosniff',
         'X-Frame-Options': 'SAMEORIGIN',
         'X-XSS-Protection': '1; mode=block',
-        'Content-Security-Policy': "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'",
+        'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:",
         'Referrer-Policy': 'strict-origin-when-cross-origin'
     }
     
