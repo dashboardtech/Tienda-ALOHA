@@ -223,9 +223,11 @@ def basic_search():
     else:  # fallback
         toys_query = toys_query.order_by(Toy.created_at.desc())
     
-    # Obtener todos los resultados sin paginación para garantizar que se muestren todos los juguetes
-    toys = toys_query.all()
-    
+    # Paginate search results to prevent unbounded queries
+    page = request.args.get('page', 1, type=int)
+    per_page = 12
+    toys_pagination = toys_query.paginate(page=page, per_page=per_page, error_out=False)
+
     # Obtener categorÃ­as para filtros
     categories = db.session.query(Toy.category).filter(
         Toy.is_active == True,
@@ -236,7 +238,8 @@ def basic_search():
     
     return render_template(
         'search.html',
-        toys=toys,
+        toys=toys_pagination.items,
+        pagination=toys_pagination,
         query=query,
         category=toy_type,
         toy_type=toy_type,
@@ -370,13 +373,13 @@ def add_to_session_cart(toy_id, quantity, toy_name, show_flash_message=True):
             # Migrar formato antiguo
             cart[toy_id_str] = {
                 'quantity': cart[toy_id_str] + quantity,
-                'price': float(toy.price)
+                'price': str(toy.price)
             }
     else:
         # Nuevo item
         cart[toy_id_str] = {
             'quantity': quantity,
-            'price': float(toy.price)
+            'price': str(toy.price)
         }
     
     session['cart'] = cart
@@ -413,12 +416,12 @@ def view_cart():
         if toy and toy.is_active:
             if isinstance(item, dict):
                 quantity = item.get('quantity', 1)
-                price = item.get('price', toy.price)
             else:
                 quantity = item
-                price = toy.price
 
-            item_total = float(price) * quantity
+            # Always use DB price, not session price
+            price = Decimal(str(toy.price))
+            item_total = float(price * quantity)
             cart_items.append({
                 'toy': toy,
                 'quantity': quantity,
@@ -445,13 +448,13 @@ def remove_from_cart(toy_id):
             session.modified = True
             
             cart = session['cart']
-            total = sum(item['quantity'] * item['price'] for item in cart.values())
-            
+            total = sum(item['quantity'] * Decimal(str(item['price'])) for item in cart.values())
+
             return jsonify({
                 'success': True,
                 'message': 'Producto eliminado del carrito',
                 'cart_count': sum(item['quantity'] for item in cart.values()),
-                'cart_total': format_currency(total)
+                'cart_total': format_currency(float(total))
             })
             
         return jsonify({'success': False, 'message': 'Producto no encontrado en el carrito'})
@@ -476,24 +479,24 @@ def update_cart(toy_id):
                 del session['cart'][toy_id_str]
                 session.modified = True
                 cart = session['cart']
-                total = sum(item['quantity'] * item['price'] for item in cart.values())
+                total = sum(item['quantity'] * Decimal(str(item['price'])) for item in cart.values())
                 return jsonify({
                     'success': True,
                     'message': 'Producto eliminado del carrito',
                     'cart_count': sum(item['quantity'] for item in cart.values()),
-                    'cart_total': format_currency(total)
+                    'cart_total': format_currency(float(total))
                 })
         else:
             if toy_id_str in session['cart']:
                 session['cart'][toy_id_str]['quantity'] = quantity
                 session.modified = True
                 cart = session['cart']
-                total = sum(item['quantity'] * item['price'] for item in cart.values())
+                total = sum(item['quantity'] * Decimal(str(item['price'])) for item in cart.values())
                 return jsonify({
                     'success': True,
                     'message': 'Carrito actualizado',
                     'cart_count': sum(item['quantity'] for item in cart.values()),
-                    'cart_total': format_currency(total)
+                    'cart_total': format_currency(float(total))
                 })
         
         return jsonify({'success': False, 'message': 'Producto no encontrado en el carrito'})
@@ -530,11 +533,14 @@ def checkout():
             for toy_id, item in session['cart'].items():
                 toy = toys_by_id.get(int(toy_id))
                 if toy:
-                    subtotal = item['quantity'] * item['price']
+                    # Always use DB price, not session price
+                    db_price = Decimal(str(toy.price))
+                    qty = item['quantity']
+                    subtotal = float(db_price * qty)
                     cart_items.append({
                         'toy': toy,
-                        'quantity': item['quantity'],
-                        'price': item['price'],
+                        'quantity': qty,
+                        'price': float(db_price),
                         'total': subtotal
                     })
                     total += subtotal
@@ -599,12 +605,12 @@ def checkout():
                 if toy.stock < item['quantity']:
                     raise Exception(f"Stock insuficiente para {toy.name}. Disponible: {toy.stock}, Solicitado: {item['quantity']}")
 
-                # Crear item de orden
+                # Crear item de orden — use DB price, never session price
                 order_item = OrderItem(
                     order=order,
                     toy_id=int(toy_id),
                     quantity=item['quantity'],
-                    price=item['price']
+                    price=toy.price
                 )
                 db.session.add(order_item)
 
