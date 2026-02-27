@@ -8,7 +8,7 @@ import logging
 from werkzeug.utils import secure_filename
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, jsonify, abort, Response, session
 from flask_login import login_required, current_user, login_user, logout_user
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy import desc, or_
 from sqlalchemy.orm import selectinload
 from decimal import Decimal, InvalidOperation
@@ -482,7 +482,7 @@ def centers_admin():
 def get_sales_chart_data():
     """Obtener datos para el gráfico de ventas de los últimos 7 días (cached 5min)"""
     try:
-        seven_days_ago = datetime.now() - timedelta(days=6)
+        seven_days_ago = datetime.now(timezone.utc) - timedelta(days=6)
         # Single query with GROUP BY instead of 7 individual queries
         rows = db.session.query(
             db.func.date(Order.order_date).label('day'),
@@ -497,7 +497,7 @@ def get_sales_chart_data():
         dates = []
         sales_data = []
         for i in range(6, -1, -1):
-            d = (datetime.now() - timedelta(days=i)).date()
+            d = (datetime.now(timezone.utc) - timedelta(days=i)).date()
             dates.append(str(d))
             sales_data.append(sales_by_date.get(str(d), 0))
 
@@ -584,7 +584,7 @@ def all_users():
         users_pagination, 'admin.all_users', search=search_term, status=status_filter
     )
     
-    today_start_dt = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    today_start_dt = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
 
     return render_template('admin_users.html',
                            users=users_pagination,
@@ -719,7 +719,7 @@ def add_toy():
                     
                     # Generar nombre único para la imagen
                     filename = secure_filename(image_file.filename)
-                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
+                    timestamp = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S_')
                     image_filename = timestamp + filename
                     
                     # Guardar la imagen
@@ -835,7 +835,7 @@ def bulk_upload_toys():
                     gender_category=data.get('gender category') or data.get('gender_category'),
                     category=data.get('category'),
                     image_url=None,
-                    updated_at=datetime.now()
+                    updated_at=datetime.now(timezone.utc)
                 )
 
                 db.session.add(toy)
@@ -903,7 +903,7 @@ def edit_toy(toy_id):
                 
                 # Generar nombre único para la nueva imagen
                 filename = secure_filename(image_file.filename)
-                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
+                timestamp = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S_')
                 image_filename = timestamp + filename
                 
                 # Guardar la nueva imagen
@@ -928,7 +928,7 @@ def edit_toy(toy_id):
                 toy.gender_category = toy_form.gender.data
             if toy_form.stock.data is not None:
                 toy.stock = toy_form.stock.data
-            toy.updated_at = datetime.now()
+            toy.updated_at = datetime.now(timezone.utc)
             
             db.session.commit()
             flash('¡Juguete actualizado exitosamente!', 'success')
@@ -992,7 +992,7 @@ def delete_toy(toy_id):
                 current_app.logger.info(f"Imagen eliminada: {image_path}")
         
         # Soft delete: marcar como eliminado en lugar de eliminar físicamente
-        toy.deleted_at = datetime.now()
+        toy.deleted_at = datetime.now(timezone.utc)
         toy.is_active = False
         
         db.session.commit()
@@ -1134,7 +1134,7 @@ def toy_edit_new(toy_id):
             toy.price = Decimal(str(request.form.get('price', toy.price)))
             toy.category = request.form.get('category', toy.category)
             toy.stock = int(request.form.get('stock', toy.stock))
-            toy.updated_at = datetime.now()
+            toy.updated_at = datetime.now(timezone.utc)
             
             # Guardar cambios
             db.session.commit()
@@ -1185,7 +1185,7 @@ def inventory_dashboard():
         
         return render_template('inventory_dashboard.html',
                              report=report,
-                             timestamp=datetime.now())
+                             timestamp=datetime.now(timezone.utc))
     except Exception as e:
         current_app.logger.error(f'Error loading inventory: {e}')
         flash('Error al cargar el inventario.', 'error')
@@ -1205,7 +1205,7 @@ def inventory_alerts():
         return jsonify({
             'alerts': alerts,
             'count': len(alerts),
-            'timestamp': datetime.now().isoformat()
+            'timestamp': datetime.now(timezone.utc).isoformat()
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -1298,8 +1298,8 @@ def delete_order(order_id):
 
         order.status = 'cancelled'
         order.is_active = False
-        order.deleted_at = datetime.now()
-        order.updated_at = datetime.now()
+        order.deleted_at = datetime.now(timezone.utc)
+        order.updated_at = datetime.now(timezone.utc)
 
         db.session.commit()
 

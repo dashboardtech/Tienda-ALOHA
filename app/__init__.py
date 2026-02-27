@@ -6,7 +6,7 @@ Este módulo crea y configura la aplicación Flask.
 import os
 import logging
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, timezone
 from flask import Flask, request, session, redirect, url_for
 from flask_login import LoginManager, current_user
 from flask_wtf.csrf import CSRFProtect
@@ -81,9 +81,6 @@ def create_app(config_class=None):
     )
     app.json_provider_class = DecimalJSONProvider
     app.json = DecimalJSONProvider(app)
-
-    # Dev: autoreload de templates
-    app.config['TEMPLATES_AUTO_RELOAD'] = True
 
     # Cargar configuración
     if config_class is None:
@@ -181,7 +178,7 @@ def create_app(config_class=None):
             return redirect(url_for('auth.login'))
 
         # actualizar timestamp de sesión
-        session['last_activity'] = datetime.now()
+        session['last_activity'] = datetime.now(timezone.utc)
         return None
 
     @app.after_request
@@ -294,9 +291,10 @@ def create_app(config_class=None):
         log_security_event('bad_request', getattr(e, "description", "Bad request"))
         return "Bad request.", 400
 
-    # Crear tablas si no existen (desarrollo)
+    # Crear tablas si no existen (solo desarrollo — producción debe usar flask db upgrade)
     with app.app_context():
-        db.create_all()
+        if app.debug:
+            db.create_all()
         ensure_order_table_columns()
         # Asegurar columna para forzar cambio de contraseña en usuarios existente
         try:

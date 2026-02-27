@@ -9,7 +9,7 @@ from flask_login import login_user, login_required, logout_user, current_user
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SelectField
 from wtforms.validators import DataRequired, Length, Email
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 # Importaciones absolutas
 from app.models import User, Center
@@ -38,14 +38,14 @@ LOGIN_WINDOW_MINUTES = 1
 
 def _is_login_rate_limited(ip):
     """Check if IP has exceeded login attempts in the time window."""
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
     cutoff = now - timedelta(minutes=LOGIN_WINDOW_MINUTES)
     _login_attempts[ip] = [t for t in _login_attempts[ip] if t > cutoff]
     return len(_login_attempts[ip]) >= MAX_LOGIN_ATTEMPTS
 
 
 def _record_login_attempt(ip):
-    _login_attempts[ip].append(datetime.now())
+    _login_attempts[ip].append(datetime.now(timezone.utc))
 
 
 # Crear el blueprint de autenticación
@@ -80,7 +80,7 @@ def login():
         user = User.query.filter_by(username=form.username.data).first()
 
         if user and user.check_password(form.password.data):
-            user.last_login = datetime.now()
+            user.last_login = datetime.now(timezone.utc)
             db.session.commit()
 
             remember = bool(request.form.get('remember'))
@@ -137,9 +137,9 @@ def register():
             username=form.username.data,
             center=center_record.slug if center_record else center_slug,
             balance=0.0,
-            created_at=datetime.now(),
+            created_at=datetime.now(timezone.utc),
             email=normalized_email,
-            last_login=datetime.now()
+            last_login=datetime.now(timezone.utc)
         )
         user.set_password(form.password.data)
 

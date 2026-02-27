@@ -25,7 +25,7 @@ class Config:
     REDIS_URL = os.environ.get('REDIS_URL') or 'redis://localhost:6379/0'
     
     # Session Security
-    PERMANENT_SESSION_LIFETIME = timedelta(days=31)
+    PERMANENT_SESSION_LIFETIME = timedelta(days=7)
     SESSION_COOKIE_SECURE = True
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
@@ -92,6 +92,7 @@ class Config:
 class DevelopmentConfig(Config):
     DEBUG = True
     TESTING = False
+    TEMPLATES_AUTO_RELOAD = True
     
     # Override some security settings for development
     SESSION_COOKIE_SECURE = False

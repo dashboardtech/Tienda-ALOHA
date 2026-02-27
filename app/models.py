@@ -2,7 +2,11 @@ from decimal import Decimal
 
 from .extensions import db
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime
+from datetime import datetime, timezone
+
+
+def _utcnow():
+    return datetime.now(timezone.utc)
 from sqlalchemy import CheckConstraint
 from flask_login import UserMixin
 
@@ -14,8 +18,8 @@ class Center(db.Model):
     slug = db.Column(db.String(64), unique=True, nullable=False, index=True)
     name = db.Column(db.String(120), nullable=False)
     discount_percentage = db.Column(db.Numeric(5, 2), nullable=False, default=Decimal('0.00'))
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.now)
-    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
+    created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=_utcnow, onupdate=_utcnow)
 
     __table_args__ = (
         CheckConstraint('discount_percentage >= 0'),
@@ -38,7 +42,7 @@ class User(UserMixin, db.Model):
     balance = db.Column(db.Numeric(10, 2), default=Decimal('0.00'))
     # User selected UI theme (site-wide), e.g., 'aloha-light', 'aloha-dark', 'patriotic'
     theme = db.Column(db.String(32), nullable=True, index=True)
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.now)
+    created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
     last_login = db.Column(db.DateTime)
     center = db.Column(db.String(64), index=True)
     profile_pic = db.Column(db.String(120))
@@ -78,8 +82,8 @@ class Toy(db.Model):
     # Categoria de Genero
     gender_category = db.Column(db.Unicode(20), index=True)
     stock = db.Column(db.Integer, default=0)
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.now)
-    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
+    created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=_utcnow, onupdate=_utcnow)
     deleted_at = db.Column(db.DateTime, nullable=True)
     is_active = db.Column(db.Boolean, default=True)
     
@@ -103,7 +107,7 @@ class Order(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
-    order_date = db.Column(db.DateTime, nullable=False, default=datetime.now, index=True)
+    order_date = db.Column(db.DateTime, nullable=False, default=_utcnow, index=True)
     subtotal_price = db.Column(db.Numeric(10, 2), nullable=False, default=Decimal('0.00'))
     discount_percentage = db.Column(db.Numeric(5, 2), nullable=False, default=Decimal('0.00'))
     discount_amount = db.Column(db.Numeric(10, 2), nullable=False, default=Decimal('0.00'))
@@ -111,8 +115,8 @@ class Order(db.Model):
     discount_center = db.Column(db.String(64), nullable=True, index=True)
     total_price = db.Column(db.Numeric(10, 2), nullable=False)
     status = db.Column(db.String(20), default='completada', nullable=False)  # completada, en_proceso, cancelada
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.now)
-    updated_at = db.Column(db.DateTime, onupdate=datetime.now)
+    created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
+    updated_at = db.Column(db.DateTime, onupdate=_utcnow)
     deleted_at = db.Column(db.DateTime, nullable=True)
     is_active = db.Column(db.Boolean, default=True)
 
@@ -136,8 +140,8 @@ class OrderItem(db.Model):
     toy_id = db.Column(db.Integer, db.ForeignKey('toy.id', ondelete='CASCADE'), nullable=False)
     quantity = db.Column(db.Integer, nullable=False)
     price = db.Column(db.Numeric(10, 2), nullable=False)
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.now)
-    updated_at = db.Column(db.DateTime, onupdate=datetime.now)
+    created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
+    updated_at = db.Column(db.DateTime, onupdate=_utcnow)
     is_active = db.Column(db.Boolean, default=True)
 
     __table_args__ = (
