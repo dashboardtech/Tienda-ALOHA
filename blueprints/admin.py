@@ -686,9 +686,9 @@ def update_user_balance(user_id):
     try:
         if request.is_json:
             data = request.get_json() or {}
-            amount = float(data.get('balance'))
+            amount = Decimal(str(data.get('balance')))
         else:
-            amount = float(request.form.get('balance'))
+            amount = Decimal(str(request.form.get('balance')))
         if amount < 0:
             return jsonify({'success': False, 'message': 'El saldo no puede ser negativo'}), 400
         user.balance = amount
@@ -841,9 +841,9 @@ def bulk_upload_toys():
             current_app.logger.debug(f'[{idx}/{len(reader)}] Procesando: {name}')
             try:
                 try:
-                    price = float(data.get('price', 0) or 0)
-                except ValueError:
-                    price = 0.0
+                    price = Decimal(str(data.get('price', 0) or 0))
+                except (ValueError, InvalidOperation):
+                    price = Decimal('0.00')
                 try:
                     stock = int(data.get('stock', 0) or 0)
                 except ValueError:
@@ -1170,7 +1170,7 @@ def toy_edit_new(toy_id):
             # Actualizar datos básicos
             toy.name = request.form.get('name', toy.name)
             toy.description = request.form.get('description', toy.description)
-            toy.price = float(request.form.get('price', toy.price))
+            toy.price = Decimal(str(request.form.get('price', toy.price)))
             toy.category = request.form.get('category', toy.category)
             toy.stock = int(request.form.get('stock', toy.stock))
             toy.updated_at = datetime.now()
@@ -1348,7 +1348,7 @@ def delete_order(order_id):
             item.is_active = False
 
         user_balance = Decimal(str(order.user.balance or 0))
-        order.user.balance = float(user_balance + refund_amount)
+        order.user.balance = user_balance + refund_amount
 
         order.status = 'cancelled'
         order.is_active = False
@@ -1391,16 +1391,16 @@ def download_receipt(order_id):
         "",
         "Items:",
     ]
-    total_calc = 0.0
+    total_calc = Decimal('0.00')
     for it in order.items:
-        subtotal = (it.price or 0.0) * (it.quantity or 0)
+        subtotal = Decimal(str(it.price or 0)) * (it.quantity or 0)
         total_calc += subtotal
         toy_name = it.toy.name if getattr(it, 'toy', None) else f"Toy ID {it.toy_id}"
         lines.append(f" - {toy_name} x{it.quantity} = A$ {subtotal:.2f}")
     lines.append("")
-    subtotal = float(order.subtotal_price or order.total_price or 0.0)
-    discount_amount = float(order.discount_amount or 0.0)
-    final_total = float(order.total_price or 0.0)
+    subtotal = order.subtotal_price or order.total_price or Decimal('0.00')
+    discount_amount = order.discount_amount or Decimal('0.00')
+    final_total = order.total_price or Decimal('0.00')
     discount_label = ''
     if getattr(order, 'discount_center', None):
         center_obj = Center.query.filter_by(slug=order.discount_center).first()
@@ -1510,7 +1510,7 @@ def add_user():
             is_admin=form.is_admin.data,
             is_active=form.is_active.data
         )
-        new_user.balance = (form.balance.data or 0.0)
+        new_user.balance = (form.balance.data or Decimal('0.00'))
         # Marcar que debe cambiar contraseña si el admin lo requiere (por defecto True)
         try:
             new_user.must_change_password = bool(getattr(form, 'require_password_change', None) and form.require_password_change.data)
@@ -1759,7 +1759,7 @@ def adjust_balance(user_id):
     except (InvalidOperation, TypeError):
         return jsonify({'error': 'Cantidad inválida'}), 400
 
-    new_balance = user.balance + float(amount)
+    new_balance = user.balance + amount
     if new_balance < 0:
         return jsonify({'error': 'El saldo no puede quedar negativo'}), 400
 
