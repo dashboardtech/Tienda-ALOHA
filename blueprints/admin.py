@@ -63,14 +63,16 @@ except ImportError:
 # Crear el blueprint de administración
 admin_bp = Blueprint('admin', __name__)
 
-@admin_bp.route('/dashboard')
+
+@admin_bp.before_request
 @login_required
+def require_admin():
+    """Centralized admin authorization — all admin routes require admin role."""
+
+
+@admin_bp.route('/dashboard')
 def dashboard():
     """Panel de administración principal - OPTIMIZADO CON INVENTARIO INTELIGENTE"""
-    if not current_user.is_admin:
-        flash('Acceso denegado', 'error')
-        return redirect(url_for('shop.index'))
-    
     toy_form = ToyForm()
     page = PaginationHelper.get_page_number()
     per_page = PaginationHelper.get_per_page(default=20)
@@ -207,12 +209,8 @@ def get_dashboard_stats_optimized():
 
 
 @admin_bp.route('/centers', methods=['GET', 'POST'])
-@login_required
 def centers_admin():
     """Administración de centros ALOHA con métricas agregadas."""
-    if not current_user.is_admin:
-        flash('Acceso denegado', 'error')
-        return redirect(url_for('shop.index'))
 
     redirect_to_self = False
 
@@ -253,6 +251,7 @@ def centers_admin():
                             )
                             db.session.add(new_center)
                             db.session.commit()
+                            cache.delete('ctx_centers')
                             flash(f'Centro "{name}" creado exitosamente.', 'success')
             elif action == 'update_discount':
                 center_id_raw = request.form.get('center_id')
@@ -280,6 +279,7 @@ def centers_admin():
                         else:
                             center.discount_percentage = discount_value
                             db.session.commit()
+                            cache.delete('ctx_centers')
                             flash(f'Descuento actualizado para {center.name}.', 'success')
             else:
                 flash('Acción no reconocida.', 'error')
@@ -531,12 +531,8 @@ def get_center_slug_set():
 
 
 @admin_bp.route('/users')
-@login_required
 def all_users():
     """Página para administrar usuarios con paginación."""
-    if not current_user.is_admin:
-        flash('Acceso denegado. No tienes permisos de administrador.', 'danger')
-        return redirect(url_for('shop.index'))
 
     page = PaginationHelper.get_page_number()
     per_page = PaginationHelper.get_per_page(default=15)
@@ -604,11 +600,7 @@ def all_users():
 
 
 @admin_bp.route('/toggle_admin/<int:user_id>', methods=['POST'])
-@login_required
 def toggle_admin(user_id):
-    if not current_user.is_admin:
-        flash('Acceso denegado.', 'danger')
-        return redirect(url_for('shop.index'))
 
     user_to_toggle = User.query.get_or_404(user_id)
     
@@ -623,21 +615,18 @@ def toggle_admin(user_id):
         flash(f'Rol de administrador para {user_to_toggle.username} actualizado.', 'success')
     except Exception as e:
         db.session.rollback()
-        flash(f'Error al actualizar rol de administrador: {str(e)}', 'danger')
+        current_app.logger.error(f'Error toggling admin: {e}')
+        flash('Error al actualizar rol de administrador.', 'danger')
     return redirect(url_for('admin.all_users'))
 
 
 @admin_bp.route('/toggle_user/<int:user_id>', methods=['POST'])
-@login_required
 def toggle_user(user_id):
-    if not current_user.is_admin:
-        flash('Acceso denegado.', 'danger')
-        return redirect(url_for('shop.index'))
 
     user_to_toggle = User.query.get_or_404(user_id)
 
     # Admins cannot deactivate themselves
-    if user_to_toggle.id == current_user.id and not user_to_toggle.is_active:
+    if user_to_toggle.id == current_user.id and user_to_toggle.is_active:
         flash('No puedes desactivar tu propia cuenta de administrador.', 'warning')
         return redirect(url_for('admin.all_users'))
 
@@ -647,16 +636,13 @@ def toggle_user(user_id):
         flash(f'Estado de activación para {user_to_toggle.username} actualizado.', 'success')
     except Exception as e:
         db.session.rollback()
-        flash(f'Error al actualizar estado de activación: {str(e)}', 'danger')
+        current_app.logger.error(f'Error toggling user status: {e}')
+        flash('Error al actualizar estado de activación.', 'danger')
     return redirect(url_for('admin.all_users'))
 
 
 @admin_bp.route('/delete_user/<int:user_id>', methods=['POST'])
-@login_required
 def delete_user(user_id):
-    if not current_user.is_admin:
-        flash('Acceso denegado.', 'danger')
-        return redirect(url_for('shop.index'))
 
     if user_id == current_user.id:
         flash('No puedes eliminar tu propia cuenta.', 'warning')
@@ -670,17 +656,15 @@ def delete_user(user_id):
         flash(f'Usuario {user_to_delete.username} eliminado correctamente.', 'success')
     except Exception as e:
         db.session.rollback()
-        flash(f'Error al eliminar usuario: {str(e)}', 'danger')
+        current_app.logger.error(f'Error deleting user: {e}')
+        flash('Error al eliminar usuario.', 'danger')
 
     return redirect(url_for('admin.all_users'))
 
 
 @admin_bp.route('/users/<int:user_id>/balance', methods=['POST'])
-@login_required
 def update_user_balance(user_id):
     """Actualizar saldo (ALOHA Dollars) de un usuario desde el panel admin."""
-    if not current_user.is_admin:
-        return jsonify({'success': False, 'message': 'Acceso denegado'}), 403
 
     user = User.query.get_or_404(user_id)
     try:
@@ -701,13 +685,9 @@ def update_user_balance(user_id):
 
 @admin_bp.route('/toys/add', methods=['POST'])
 @admin_bp.route('/add_toy', methods=['GET', 'POST'])
-@login_required
 @moderate_rate_limit(message="⚠️ Demasiados intentos de agregar juguetes. Espera un momento.")
 def add_toy():
     """Agregar un nuevo juguete"""
-    if not current_user.is_admin:
-        flash('Acceso denegado', 'error')
-        return redirect(url_for('shop.index'))
     
     toy_form = ToyForm()
     if toy_form.validate_on_submit():
@@ -786,7 +766,8 @@ def add_toy():
             
         except Exception as e:
             db.session.rollback()
-            flash(f'Error al agregar el juguete: {str(e)}', 'error')
+            current_app.logger.error(f'Error adding toy: {e}')
+            flash('Error al agregar el juguete.', 'error')
     else:
         for field, errors in toy_form.errors.items():
             for error in errors:
@@ -795,12 +776,8 @@ def add_toy():
     return redirect(url_for('admin.toys_page'))
 
 @admin_bp.route('/bulk_upload_toys', methods=['GET', 'POST'])
-@login_required
 def bulk_upload_toys():
     """Cargar juguetes desde un CSV (sin imágenes)."""
-    if not current_user.is_admin:
-        flash('Acceso denegado', 'error')
-        return redirect(url_for('shop.index'))
 
     valid_centers = get_center_slug_set()
 
@@ -894,12 +871,8 @@ def bulk_upload_toys():
 
     return render_template('bulk_upload_toys.html')
 @admin_bp.route('/edit_toy/<int:toy_id>', methods=['GET', 'POST'])
-@login_required
 def edit_toy(toy_id):
     """Editar un juguete existente"""
-    if not current_user.is_admin:
-        flash('Acceso denegado', 'error')
-        return redirect(url_for('shop.index'))
     
     toy = Toy.query.get_or_404(toy_id)
     toy_form = ToyForm(obj=toy)
@@ -957,7 +930,8 @@ def edit_toy(toy_id):
             
         except Exception as e:
             db.session.rollback()
-            flash(f'Error al actualizar el juguete: {str(e)}', 'error')
+            current_app.logger.error(f'Error updating toy: {e}')
+            flash('Error al actualizar el juguete.', 'error')
             return jsonify({'success': False, 'message': str(e)}), 500 if request.headers.get('X-Requested-With') == 'XMLHttpRequest' else redirect(url_for('admin.dashboard'))
         
         return redirect(url_for('admin.dashboard'))
@@ -994,15 +968,9 @@ def edit_toy(toy_id):
         return render_template('edit_toy.html', toy=toy, form=toy_form)
 
 @admin_bp.route('/delete_toy/<int:toy_id>', methods=['POST'])
-@login_required
 @moderate_rate_limit(message="⚠️ Demasiados intentos de eliminación. Espera un momento.")
 def delete_toy(toy_id):
     """Eliminar un juguete (soft delete) - CORREGIDO PARA AJAX"""
-    if not current_user.is_admin:
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return jsonify({'success': False, 'message': 'Acceso denegado'}), 403
-        flash('Acceso denegado', 'error')
-        return redirect(url_for('shop.index'))
     
     try:
         current_app.logger.info(f"Eliminando juguete {toy_id} - Headers: {dict(request.headers)}")
@@ -1035,9 +1003,8 @@ def delete_toy(toy_id):
 
     except Exception as e:
         db.session.rollback()
-        error_msg = f'Error al eliminar el juguete: {str(e)}'
-        current_app.logger.error(error_msg)
-        
+        current_app.logger.error(f'Error deleting toy {toy_id}: {e}')
+        error_msg = 'Error al eliminar el juguete.'
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return jsonify({
                 'success': False,
@@ -1047,11 +1014,8 @@ def delete_toy(toy_id):
             flash(error_msg, 'error')
             return redirect(url_for('admin.toys_page'))
 @admin_bp.route('/toys/<int:toy_id>/stock', methods=['POST'])
-@login_required
 def update_toy_stock(toy_id):
     """Ajustar el stock de un juguete"""
-    if not current_user.is_admin:
-        return jsonify({'success': False, 'message': 'Acceso denegado'}), 403
 
     toy = Toy.query.get_or_404(toy_id)
     try:
@@ -1066,12 +1030,8 @@ def update_toy_stock(toy_id):
 
 # NUEVA RUTA: Gestión dedicada de juguetes
 @admin_bp.route('/toys')
-@login_required
 def toys_page():
     """Página independiente para gestionar juguetes"""
-    if not current_user.is_admin:
-        flash('Acceso denegado', 'error')
-        return redirect(url_for('shop.index'))
 
     toy_form = ToyForm()
     toys = (
@@ -1085,11 +1045,8 @@ def toys_page():
 
 # Administrar centros por juguete (obtener/actualizar)
 @admin_bp.route('/toys/<int:toy_id>/centers', methods=['GET', 'POST'])
-@login_required
 def manage_toy_centers(toy_id):
     """Obtener o actualizar disponibilidad por centro para un juguete."""
-    if not current_user.is_admin:
-        return jsonify({'success': False, 'message': 'Acceso denegado'}), 403
 
     toy = Toy.query.get_or_404(toy_id)
 
@@ -1133,13 +1090,9 @@ def manage_toy_centers(toy_id):
 
 # NUEVA IMPLEMENTACIÓN: Edición de juguetes simple y robusta
 @admin_bp.route('/toy_edit_new/<int:toy_id>', methods=['POST'])
-@login_required
 @moderate_rate_limit(message="⚠️ Demasiados intentos de edición. Espera un momento.")
 def toy_edit_new(toy_id):
     """Nueva implementación simple para editar juguetes"""
-    if not current_user.is_admin:
-        flash('Acceso denegado', 'error')
-        return redirect(url_for('shop.index'))
     
     toy = Toy.query.get_or_404(toy_id)
     
@@ -1211,12 +1164,8 @@ def toy_edit_new(toy_id):
                 return redirect(url_for('admin.toys_page'))
 
 @admin_bp.route('/inventory')
-@login_required
 def inventory_dashboard():
     """Dashboard completo de inventario inteligente"""
-    if not current_user.is_admin:
-        flash('Acceso denegado', 'error')
-        return redirect(url_for('shop.index'))
     
     if not ADVANCED_SYSTEMS_AVAILABLE:
         flash('Sistema de inventario no disponible', 'warning')
@@ -1230,15 +1179,13 @@ def inventory_dashboard():
                              report=report,
                              timestamp=datetime.now())
     except Exception as e:
-        flash(f'Error cargando inventario: {str(e)}', 'error')
+        current_app.logger.error(f'Error loading inventory: {e}')
+        flash('Error al cargar el inventario.', 'error')
         return redirect(url_for('admin.dashboard'))
 
 @admin_bp.route('/inventory/alerts')
-@login_required
 def inventory_alerts():
     """API endpoint para obtener alertas de inventario"""
-    if not current_user.is_admin:
-        return jsonify({'error': 'Acceso denegado'}), 403
     
     if not ADVANCED_SYSTEMS_AVAILABLE:
         return jsonify({'error': 'Sistema no disponible'}), 503
@@ -1256,12 +1203,8 @@ def inventory_alerts():
         return jsonify({'error': str(e)}), 500
 
 @admin_bp.route('/orders')
-@login_required
 def all_orders():
     """Mostrar todas las órdenes con paginación"""
-    if not current_user.is_admin:
-        flash('Acceso denegado', 'error')
-        return redirect(url_for('shop.index'))
     
     page = request.args.get('page', 1, type=int)
     per_page = 20
@@ -1270,9 +1213,12 @@ def all_orders():
     search_query = request.args.get('search', '').strip()
     status_filter = request.args.get('status', 'all')
     
-    # Construir consulta base
-    query = Order.query
-    
+    # Construir consulta base with eager loading to avoid N+1 queries
+    query = Order.query.options(
+        selectinload(Order.items).selectinload(OrderItem.toy),
+        selectinload(Order.user)
+    )
+
     # Aplicar filtros
     if search_query:
         search = f"%{search_query}%"
@@ -1301,15 +1247,8 @@ def all_orders():
 
 
 @admin_bp.route('/orders/<int:order_id>/delete', methods=['POST'])
-@login_required
 def delete_order(order_id):
     """Cancelar una orden, restaurando inventario y saldo del comprador."""
-    if not current_user.is_admin:
-        message = 'Acceso denegado'
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.accept_mimetypes.accept_json:
-            return jsonify({'success': False, 'message': message}), 403
-        flash(message, 'error')
-        return redirect(url_for('shop.index'))
 
     order = Order.query.options(
         selectinload(Order.items).selectinload(OrderItem.toy),
@@ -1331,15 +1270,14 @@ def delete_order(order_id):
         return redirect(url_for('admin.all_orders'))
 
     try:
-        refund_amount = Decimal('0.00')
-
         if not order.user:
             raise ValueError('La orden no tiene un usuario asociado para procesar el reembolso.')
 
+        # Refund what the user actually paid (after discount), not the subtotal
+        refund_amount = Decimal(str(order.total_price or 0))
+
         for item in order.items:
             quantity = item.quantity or 0
-            price = Decimal(str(item.price or 0))
-            refund_amount += price * quantity
 
             if item.toy:
                 current_stock = item.toy.stock or 0
@@ -1364,21 +1302,18 @@ def delete_order(order_id):
         return redirect(url_for('admin.all_orders'))
     except Exception as exc:
         db.session.rollback()
-        error_message = f'No se pudo cancelar la orden: {str(exc)}'
-        current_app.logger.exception(error_message)
+        current_app.logger.exception(f'Error cancelling order {order_id}: {exc}')
+        error_message = 'No se pudo cancelar la orden. Intenta nuevamente.'
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.accept_mimetypes.accept_json:
             return jsonify({'success': False, 'message': error_message}), 500
         flash(error_message, 'error')
         return redirect(url_for('admin.all_orders'))
 
 @admin_bp.route('/orders/<int:order_id>/receipt')
-@login_required
 def download_receipt(order_id):
     """Descargar recibo simple de la orden como archivo de texto.
     Evita errores 500 por enlaces en la plantilla y permite exportar detalles básicos.
     """
-    if not current_user.is_admin:
-        return jsonify({'error': 'Acceso denegado'}), 403
 
     order = Order.query.get_or_404(order_id)
     # Construir un recibo simple
@@ -1424,11 +1359,8 @@ def download_receipt(order_id):
     return Response(content, mimetype='text/plain', headers=headers)
 
 @admin_bp.route('/inventory/send-alerts', methods=['POST'])
-@login_required
 def send_inventory_alerts():
     """Enviar alertas de inventario por email"""
-    if not current_user.is_admin:
-        return jsonify({'error': 'Acceso denegado'}), 403
     
     if not ADVANCED_SYSTEMS_AVAILABLE:
         return jsonify({'error': 'Sistema de inventario no disponible'}), 503
@@ -1462,11 +1394,7 @@ def send_inventory_alerts():
         return jsonify({'error': str(e)}), 500
 
 @admin_bp.route('/add_user', methods=['GET', 'POST'])
-@login_required
 def add_user():
-    if not current_user.is_admin:
-        flash('Acceso denegado.', 'danger')
-        return redirect(url_for('admin.dashboard'))
     
     form = AddUserForm()
     center_choices, center_lookup = get_center_choices(include_lookup=True)
@@ -1530,7 +1458,8 @@ def add_user():
             current_app.logger.exception("Error adding user %s", form.username.data)
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 return jsonify({'success': False, 'message': str(e)}), 400
-            flash(f'Error al agregar usuario: {str(e)}', 'danger')
+            current_app.logger.error(f'Error adding user: {e}')
+            flash('Error al agregar usuario.', 'danger')
             return redirect(url_for('admin.all_users'))
 
     if request.method == 'POST':
@@ -1544,11 +1473,7 @@ def add_user():
         return redirect(url_for('admin.all_users'))
 
 @admin_bp.route('/edit_user/<int:user_id>', methods=['GET', 'POST'])
-@login_required
 def edit_user(user_id):
-    if not current_user.is_admin:
-        flash('Acceso denegado.', 'danger')
-        return redirect(url_for('admin.dashboard'))
 
     user_to_edit = User.query.get_or_404(user_id)
     form = EditUserForm(original_username=user_to_edit.username, original_email=user_to_edit.email, obj=user_to_edit)
@@ -1596,30 +1521,23 @@ def edit_user(user_id):
             return redirect(url_for('admin.all_users'))
         except Exception as e:
             db.session.rollback()
-            flash(f'Error al actualizar usuario: {str(e)}', 'danger')
+            current_app.logger.error(f'Error updating user: {e}')
+            flash('Error al actualizar usuario.', 'danger')
             current_app.logger.error(f"Error updating user {user_to_edit.username}: {str(e)}")
             
     return render_template('admin_edit_user.html', title='Editar Usuario', form=form, user_id=user_id)
 
 @admin_bp.route('/view_user/<int:user_id>')
-@login_required
 def view_user(user_id):
     """Muestra los detalles de un usuario específico para administradores."""
-    if not current_user.is_admin:
-        flash('Acceso denegado.', 'danger')
-        return redirect(url_for('admin.all_users'))
 
     user = User.query.get_or_404(user_id)
     return render_template('admin_view_user.html', user=user)
 
 # ---------------------- Acciones masivas sobre usuarios ----------------------
 @admin_bp.route('/bulk_users_action', methods=['POST'])
-@login_required
 def bulk_users_action():
     """Procesa acciones masivas (activar, desactivar, eliminar) sobre usuarios seleccionados en la tabla."""
-    if not current_user.is_admin:
-        flash('Acceso denegado.', 'danger')
-        return redirect(url_for('shop.index'))
 
     action = request.form.get('action')
     user_ids = request.form.getlist('user_ids')
@@ -1666,7 +1584,8 @@ def bulk_users_action():
             flash('No se realizaron cambios.', 'info')
     except Exception as e:
         db.session.rollback()
-        flash(f'Error al procesar usuarios: {str(e)}', 'danger')
+        current_app.logger.error(f'Error bulk action: {e}')
+        flash('Error al procesar usuarios.', 'danger')
 
     return redirect(url_for('admin.all_users'))
 
@@ -1685,12 +1604,8 @@ def _generate_csv_response(csv_content: str, filename: str) -> Response:
 
 
 @admin_bp.route('/export_orders')
-@login_required
 def export_orders():
     """Exportar todas las órdenes en CSV."""
-    if not current_user.is_admin:
-        flash('Acceso denegado.', 'danger')
-        return redirect(url_for('shop.index'))
 
     import csv, io
     output = io.StringIO()
@@ -1715,12 +1630,8 @@ def export_orders():
 
 
 @admin_bp.route('/export_inventory')
-@login_required
 def export_inventory():
     """Exportar inventario de juguetes en CSV."""
-    if not current_user.is_admin:
-        flash('Acceso denegado.', 'danger')
-        return redirect(url_for('shop.index'))
 
     import csv, io
     output = io.StringIO()
@@ -1745,10 +1656,7 @@ def export_inventory():
 # Ajustar saldo de usuario (Aloha Dólares)
 # ------------------------------
 @admin_bp.route('/adjust_balance/<int:user_id>', methods=['POST'])
-@login_required
 def adjust_balance(user_id):
-    if not current_user.is_admin:
-        return jsonify({'error': 'Acceso denegado'}), 403
 
     user = User.query.get_or_404(user_id)
 
@@ -1779,11 +1687,8 @@ def adjust_balance(user_id):
 # ===============================
 
 @admin_bp.route('/backup')
-@login_required
 def backup_dashboard():
     """Dashboard de gestión de backups (solo superuser)"""
-    if not current_user.is_admin:
-        abort(403)
     
     if not BACKUP_SYSTEM_AVAILABLE:
         flash('⚠️ Sistema de backup no disponible', 'warning')
@@ -1801,12 +1706,9 @@ def backup_dashboard():
     return render_template('admin_backup.html', backups=backups)
 
 @admin_bp.route('/backup/create', methods=['POST'])
-@login_required
 @strict_rate_limit(message="⚠️ Solo se permite un backup cada 5 minutos.")
 def create_backup():
     """Crear un nuevo backup (solo superuser)"""
-    if not current_user.is_admin:
-        return jsonify({'error': 'Acceso denegado'}), 403
     
     if not BACKUP_SYSTEM_AVAILABLE:
         return jsonify({'error': 'Sistema de backup no disponible'}), 500
@@ -1850,11 +1752,8 @@ def create_backup():
             return redirect(url_for('admin.backup_dashboard'))
 
 @admin_bp.route('/backup/download/<filename>')
-@login_required
 def download_backup(filename):
     """Descargar un archivo de backup (solo superuser)"""
-    if not current_user.is_admin:
-        abort(403)
     
     if not BACKUP_SYSTEM_AVAILABLE:
         abort(404)
@@ -1881,12 +1780,9 @@ def download_backup(filename):
         abort(500)
 
 @admin_bp.route('/backup/delete/<filename>', methods=['POST'])
-@login_required
 @moderate_rate_limit(message="⚠️ Demasiados intentos de eliminación de backup.")
 def delete_backup(filename):
     """Eliminar un archivo de backup (solo superuser)"""
-    if not current_user.is_admin:
-        return jsonify({'error': 'Acceso denegado'}), 403
     
     if not BACKUP_SYSTEM_AVAILABLE:
         return jsonify({'error': 'Sistema de backup no disponible'}), 500
