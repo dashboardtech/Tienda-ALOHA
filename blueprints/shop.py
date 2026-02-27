@@ -649,10 +649,6 @@ def checkout():
                          discounted_total=discounted_total,
                          center_discount=center_record)
 
-def format_currency(amount):
-    """Formatea un monto como moneda"""
-    return f"A$ {amount:,.2f}"
-
 def generate_pdf(order):
     """Genera un PDF con el recibo de la orden"""
     from reportlab.lib.pagesizes import letter

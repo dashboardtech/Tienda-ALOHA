@@ -9,6 +9,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 from datetime import datetime
 from sqlalchemy import desc
+from sqlalchemy.orm import selectinload
 
 # Importaciones absolutas
 from app.models import Toy, Order, OrderItem, User, Center
@@ -24,7 +25,9 @@ user_bp = Blueprint('user', __name__, url_prefix='/user')
 def profile():
     """Página de perfil del usuario con historial de órdenes"""
     # Obtener las órdenes del usuario ordenadas por fecha descendente
-    orders = Order.query.filter_by(user_id=current_user.id).order_by(desc(Order.order_date)).all()
+    orders = Order.query.filter_by(user_id=current_user.id)\
+        .options(selectinload(Order.items))\
+        .order_by(desc(Order.order_date)).all()
     
     # Formatear las órdenes para la vista
     formatted_orders = []
