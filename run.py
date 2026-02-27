@@ -8,7 +8,13 @@ Versión: 2.0
 """
 import os
 import sys
+import io
 from pathlib import Path
+
+# Fix Windows console encoding (cp1252 can't handle Unicode/emojis)
+if sys.stdout.encoding and sys.stdout.encoding.lower() != 'utf-8':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 # Agregar el directorio actual al path para importaciones antes de importar "app"
 sys.path.insert(0, str(Path(__file__).parent))
