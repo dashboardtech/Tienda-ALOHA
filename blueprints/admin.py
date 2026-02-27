@@ -68,6 +68,8 @@ admin_bp = Blueprint('admin', __name__)
 @login_required
 def require_admin():
     """Centralized admin authorization — all admin routes require admin role."""
+    if not current_user.is_admin:
+        abort(403)
 
 
 @admin_bp.route('/dashboard')
