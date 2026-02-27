@@ -3,6 +3,8 @@ Blueprint para funcionalidades de la tienda.
 
 Incluye: index, bÃºsqueda avanzada, carrito persistente, checkout, Ã³rdenes
 """
+from decimal import Decimal
+
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify, make_response, current_app
 from flask_login import login_required, current_user
 from datetime import datetime
@@ -541,9 +543,9 @@ def checkout():
         flash('Error al cargar el carrito', 'error')
         return redirect(url_for('shop.view_cart'))
 
-    subtotal = total
-    discount_percentage = 0.0
-    discount_amount = 0.0
+    subtotal = Decimal(str(total)).quantize(Decimal('0.01'))
+    discount_percentage = Decimal('0.00')
+    discount_amount = Decimal('0.00')
     discounted_total = subtotal
     center_record = None
 
@@ -552,16 +554,16 @@ def checkout():
         if center_slug:
             center_record = Center.query.filter_by(slug=center_slug).first()
             if center_record:
-                discount_percentage = float(center_record.discount_percentage or 0.0)
+                discount_percentage = Decimal(str(center_record.discount_percentage or 0))
                 if discount_percentage > 0:
-                    discount_amount = round(subtotal * (discount_percentage / 100.0), 2)
+                    discount_amount = (subtotal * discount_percentage / Decimal('100')).quantize(Decimal('0.01'))
                     if discount_amount > subtotal:
                         discount_amount = subtotal
-                    discounted_total = round(subtotal - discount_amount, 2)
+                    discounted_total = (subtotal - discount_amount).quantize(Decimal('0.01'))
     except Exception as exc:
         current_app.logger.error(f"Error al calcular descuento de centro: {exc}")
-        discount_percentage = 0.0
-        discount_amount = 0.0
+        discount_percentage = Decimal('0.00')
+        discount_amount = Decimal('0.00')
         discounted_total = subtotal
         center_record = None
 

@@ -5,6 +5,7 @@ Este módulo crea y configura la aplicación Flask.
 
 import os
 import logging
+from decimal import Decimal
 from datetime import datetime
 from flask import Flask, request, session, redirect, url_for
 from flask_login import LoginManager, current_user
@@ -57,6 +58,15 @@ def load_user(user_id):
         return None
 
 
+class DecimalJSONProvider(Flask.json_provider_class):
+    """Serialize Decimal values as floats so jsonify() doesn't crash."""
+
+    def default(self, o):
+        if isinstance(o, Decimal):
+            return float(o)
+        return super().default(o)
+
+
 def create_app(config_class=None):
     """Crea y configura la aplicación Flask."""
     # Directorios de templates/static (como tenías en tu factory)
@@ -69,6 +79,8 @@ def create_app(config_class=None):
         static_folder=static_dir,
         static_url_path='/static'
     )
+    app.json_provider_class = DecimalJSONProvider
+    app.json = DecimalJSONProvider(app)
 
     # Dev: autoreload de templates
     app.config['TEMPLATES_AUTO_RELOAD'] = True

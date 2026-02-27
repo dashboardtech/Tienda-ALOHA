@@ -3,6 +3,8 @@ Blueprint para funcionalidades de usuario
 Incluye: perfil, balance, cambio de contraseña, actualización de centro, historial de órdenes
 """
 
+from decimal import Decimal
+
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, abort, current_app
 from flask_login import login_required, current_user
 from datetime import datetime
@@ -50,7 +52,7 @@ def add_balance():
         if not target_user:
             return jsonify({'success': False, 'message': 'Usuario no encontrado'}), 404
 
-        amount = float(request.form.get('amount', 0))
+        amount = Decimal(request.form.get('amount', '0'))
         if amount <= 0:
             return jsonify({'success': False, 'message': 'Cantidad inválida'}), 400
 

@@ -1,12 +1,12 @@
 from flask_wtf import FlaskForm
-from wtforms import StringField, TextAreaField, FloatField, IntegerField, SelectField, SubmitField, PasswordField, BooleanField
+from wtforms import StringField, TextAreaField, DecimalField, IntegerField, SelectField, SubmitField, PasswordField, BooleanField
 from wtforms.validators import DataRequired, NumberRange, Length, Email, EqualTo, Optional, ValidationError # Added Email, EqualTo, Optional, ValidationError
 from flask_wtf.file import FileField, FileAllowed
 
 class ToyForm(FlaskForm):
     name = StringField('Nombre del Juguete', validators=[DataRequired(), Length(min=3, max=100)])
     description = TextAreaField('Descripción')
-    price = FloatField('Precio (A$)', validators=[DataRequired(), NumberRange(min=0.01)])
+    price = DecimalField('Precio (A$)', validators=[DataRequired(), NumberRange(min=0.01)])
     # Categorías pregrabadas (incluye las categorías existentes en la base de datos)
     CATEGORIES = [
         ('Niña', 'Niña'),
@@ -97,7 +97,7 @@ class AddUserForm(FlaskForm):
     password = PasswordField('Contraseña', validators=[DataRequired(), Length(min=6)])
     confirm_password = PasswordField('Confirmar Contraseña', validators=[DataRequired(), EqualTo('password', message='Las contraseñas deben coincidir.')])
     center = SelectField('Centro/Sucursal', choices=[], validators=[DataRequired()])
-    balance = FloatField('Saldo Inicial (A$)', validators=[Optional(), NumberRange(min=0)])
+    balance = DecimalField('Saldo Inicial (A$)', validators=[Optional(), NumberRange(min=0)])
     require_password_change = BooleanField('Requerir cambio de contraseA�a al primer ingreso', default=True)
     is_admin = BooleanField('¿Es Administrador?', default=False)
     is_active = BooleanField('¿Está Activo?', default=True)
@@ -113,7 +113,7 @@ class EditUserForm(FlaskForm):
     new_password = PasswordField('Nueva Contraseña (dejar en blanco para no cambiar)', validators=[Optional(), Length(min=6)])
     confirm_new_password = PasswordField('Confirmar Nueva Contraseña', validators=[EqualTo('new_password', message='Las nuevas contraseñas deben coincidir.')])
     center = SelectField('Centro/Sucursal', choices=[], validators=[DataRequired()])
-    balance = FloatField('Saldo (A$)', validators=[Optional(), NumberRange(min=0)])
+    balance = DecimalField('Saldo (A$)', validators=[Optional(), NumberRange(min=0)])
     is_admin = BooleanField('¿Es Administrador?')
     is_active = BooleanField('¿Está Activo?')
     submit = SubmitField('Guardar Cambios')

@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from .extensions import db
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
@@ -11,7 +13,7 @@ class Center(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     slug = db.Column(db.String(64), unique=True, nullable=False, index=True)
     name = db.Column(db.String(120), nullable=False)
-    discount_percentage = db.Column(db.Float, nullable=False, default=0.0)
+    discount_percentage = db.Column(db.Numeric(5, 2), nullable=False, default=Decimal('0.00'))
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.now)
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
 
@@ -33,7 +35,7 @@ class User(UserMixin, db.Model):
     is_admin = db.Column(db.Boolean, default=False)
     # Force password reset on first login or when set by admin
     must_change_password = db.Column(db.Boolean, default=False)
-    balance = db.Column(db.Float, default=0.0)
+    balance = db.Column(db.Numeric(10, 2), default=Decimal('0.00'))
     # User selected UI theme (site-wide), e.g., 'aloha-light', 'aloha-dark', 'patriotic'
     theme = db.Column(db.String(32), nullable=True, index=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.now)
@@ -65,7 +67,7 @@ class Toy(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.Unicode(100), nullable=False, index=True)
     description = db.Column(db.UnicodeText)
-    price = db.Column(db.Float, nullable=False)
+    price = db.Column(db.Numeric(10, 2), nullable=False)
     image_url = db.Column(db.String(200))
     # Categoria de Juguete (tipo)
     category = db.Column(db.Unicode(50), index=True)
@@ -100,12 +102,12 @@ class Order(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
     order_date = db.Column(db.DateTime, nullable=False, default=datetime.now, index=True)
-    subtotal_price = db.Column(db.Float, nullable=False, default=0.0)
-    discount_percentage = db.Column(db.Float, nullable=False, default=0.0)
-    discount_amount = db.Column(db.Float, nullable=False, default=0.0)
-    discounted_total = db.Column(db.Float, nullable=False, default=0.0)
+    subtotal_price = db.Column(db.Numeric(10, 2), nullable=False, default=Decimal('0.00'))
+    discount_percentage = db.Column(db.Numeric(5, 2), nullable=False, default=Decimal('0.00'))
+    discount_amount = db.Column(db.Numeric(10, 2), nullable=False, default=Decimal('0.00'))
+    discounted_total = db.Column(db.Numeric(10, 2), nullable=False, default=Decimal('0.00'))
     discount_center = db.Column(db.String(64), nullable=True, index=True)
-    total_price = db.Column(db.Float, nullable=False)
+    total_price = db.Column(db.Numeric(10, 2), nullable=False)
     status = db.Column(db.String(20), default='completada', nullable=False)  # completada, en_proceso, cancelada
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.now)
     updated_at = db.Column(db.DateTime, onupdate=datetime.now)
@@ -131,7 +133,7 @@ class OrderItem(db.Model):
     order_id = db.Column(db.Integer, db.ForeignKey('order.id', ondelete='CASCADE'), nullable=False)
     toy_id = db.Column(db.Integer, db.ForeignKey('toy.id', ondelete='CASCADE'), nullable=False)
     quantity = db.Column(db.Integer, nullable=False)
-    price = db.Column(db.Float, nullable=False)
+    price = db.Column(db.Numeric(10, 2), nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.now)
     updated_at = db.Column(db.DateTime, onupdate=datetime.now)
     is_active = db.Column(db.Boolean, default=True)
