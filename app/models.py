@@ -126,7 +126,7 @@ class Order(db.Model):
 
 class OrderItem(db.Model):
     __tablename__ = 'order_item'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     order_id = db.Column(db.Integer, db.ForeignKey('order.id', ondelete='CASCADE'), nullable=False)
     toy_id = db.Column(db.Integer, db.ForeignKey('toy.id', ondelete='CASCADE'), nullable=False)
@@ -135,8 +135,12 @@ class OrderItem(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.now)
     updated_at = db.Column(db.DateTime, onupdate=datetime.now)
     is_active = db.Column(db.Boolean, default=True)
-    
-    __table_args__ = (CheckConstraint('quantity > 0'),)
+
+    __table_args__ = (
+        CheckConstraint('quantity > 0'),
+        db.Index('idx_orderitem_toy_active', 'toy_id', 'is_active'),
+        db.Index('idx_orderitem_order_active', 'order_id', 'is_active'),
+    )
 
 
 class ToyCenterAvailability(db.Model):

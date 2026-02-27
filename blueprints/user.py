@@ -12,6 +12,7 @@ from sqlalchemy import desc
 from app.models import Toy, Order, OrderItem, User, Center
 from app.extensions import db
 from app.filters import format_currency
+from blueprints.auth import validate_password_strength
 
 # Crear el blueprint de usuario
 user_bp = Blueprint('user', __name__, url_prefix='/user')
@@ -78,15 +79,21 @@ def change_password():
     current_password = request.form.get('current_password')
     new_password = request.form.get('new_password')
     confirm_password = request.form.get('confirm_password')
-    
+
     if not current_user.check_password(current_password):
         flash('Contraseña actual incorrecta', 'error')
         return redirect(url_for('user.profile'))
-    
+
     if new_password != confirm_password:
         flash('Las contraseñas nuevas no coinciden', 'error')
         return redirect(url_for('user.profile'))
-    
+
+    # Validate password strength before setting
+    is_strong, message = validate_password_strength(new_password)
+    if not is_strong:
+        flash(message, 'error')
+        return redirect(url_for('user.profile'))
+
     current_user.set_password(new_password)
     db.session.commit()
     flash('Contraseña actualizada correctamente', 'success')
@@ -132,7 +139,8 @@ def update_theme():
         return jsonify({'success': True})
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 400
+        current_app.logger.error(f"Error al actualizar tema: {e}")
+        return jsonify({'success': False, 'message': 'No se pudo actualizar el tema'}), 400
 
 # Helper function para los templates
 def get_toy(toy_id):
