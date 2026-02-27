@@ -101,12 +101,9 @@ def register():
 
         center_record = Center.query.filter_by(slug=center_slug).first() if center_slug else None
 
-        if existing_username:
-            flash('El nombre de usuario ya existe', 'warning')
-            return render_template('register.html', form=form)
-
-        if existing_email:
-            flash('El correo electrónico ya está en uso', 'warning')
+        # Generic error message to prevent user enumeration
+        if existing_username or existing_email:
+            flash('El nombre de usuario o correo electrónico ya está registrado. Si ya tienes una cuenta, inicia sesión.', 'warning')
             return render_template('register.html', form=form)
 
         user = User(
