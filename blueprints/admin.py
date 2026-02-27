@@ -481,28 +481,26 @@ def centers_admin():
 @cache.cached(timeout=300, key_prefix='sales_chart_7d')
 def get_sales_chart_data():
     """Obtener datos para el gráfico de ventas de los últimos 7 días (cached 5min)"""
-    dates = []
-    sales_data = []
-
     try:
-        # Ventas de los últimos 7 días (usa índice idx_order_active_date)
-        for i in range(7):
-            date = datetime.now() - timedelta(days=i)
-            dates.append(date.strftime('%Y-%m-%d'))
-            
-            daily_sales = db.session.query(
-                db.func.sum(Order.total_price)
-            ).filter(
-                Order.is_active == True,
-                db.func.date(Order.order_date) == date.date()
-            ).scalar() or 0
-            
-            sales_data.append(float(daily_sales))
-        
-        # Invertir las listas para mostrar en orden cronológico
-        dates.reverse()
-        sales_data.reverse()
-        
+        seven_days_ago = datetime.now() - timedelta(days=6)
+        # Single query with GROUP BY instead of 7 individual queries
+        rows = db.session.query(
+            db.func.date(Order.order_date).label('day'),
+            db.func.sum(Order.total_price).label('total')
+        ).filter(
+            Order.is_active == True,
+            Order.order_date >= seven_days_ago.replace(hour=0, minute=0, second=0)
+        ).group_by(db.func.date(Order.order_date)).all()
+
+        sales_by_date = {str(row.day): float(row.total) for row in rows}
+
+        dates = []
+        sales_data = []
+        for i in range(6, -1, -1):
+            d = (datetime.now() - timedelta(days=i)).date()
+            dates.append(str(d))
+            sales_data.append(sales_by_date.get(str(d), 0))
+
     except Exception as e:
         current_app.logger.error(f"Error al obtener datos del grafico: {e}")
         cache.delete('sales_chart_7d')
@@ -653,13 +651,13 @@ def delete_user(user_id):
     user_to_delete = User.query.get_or_404(user_id)
 
     try:
-        db.session.delete(user_to_delete)
+        user_to_delete.is_active = False
         db.session.commit()
-        flash(f'Usuario {user_to_delete.username} eliminado correctamente.', 'success')
+        flash(f'Usuario {user_to_delete.username} desactivado correctamente.', 'success')
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f'Error deleting user: {e}')
-        flash('Error al eliminar usuario.', 'danger')
+        flash('Error al desactivar usuario.', 'danger')
 
     return redirect(url_for('admin.all_users'))
 
@@ -841,7 +839,7 @@ def bulk_upload_toys():
                 )
 
                 db.session.add(toy)
-                db.session.commit()
+                db.session.flush()  # Get toy.id without committing
 
                 centers_str = data.get('center')
                 if centers_str:
@@ -849,12 +847,10 @@ def bulk_upload_toys():
                     if 'all' in centers:
                         for center_slug in valid_centers:
                             db.session.add(ToyCenterAvailability(toy_id=toy.id, center=center_slug))
-                        db.session.commit()
                     else:
                         filtered = [center for center in centers if center in valid_centers]
                         for center_slug in filtered:
                             db.session.add(ToyCenterAvailability(toy_id=toy.id, center=center_slug))
-                        db.session.commit()
 
                 created += 1
                 current_app.logger.debug(f'Fila {idx} procesada: {name}')
@@ -863,6 +859,16 @@ def bulk_upload_toys():
                 error_msg = f'❌ Error en fila {idx} ({name}): {e}'
                 current_app.logger.warning(error_msg)
                 errors.append(error_msg)
+
+        # Single commit for all successfully processed rows
+        if created > 0:
+            try:
+                db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+                current_app.logger.error(f'Error committing bulk upload: {e}')
+                flash('Error al guardar los juguetes.', 'danger')
+                return redirect(url_for('admin.toys_page'))
 
         for err in errors:
             flash(err, 'error')

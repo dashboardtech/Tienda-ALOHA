@@ -3,12 +3,13 @@ Blueprint para manejo de autenticación de usuarios
 Incluye: login, logout, registro
 """
 
+from collections import defaultdict
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, session
 from flask_login import login_user, login_required, logout_user, current_user
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SelectField
 from wtforms.validators import DataRequired, Length, Email
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # Importaciones absolutas
 from app.models import User, Center
@@ -28,6 +29,24 @@ def validate_password_strength(password):
     if not any(c.isdigit() for c in password):
         return False, "Password must contain at least one number"
     return True, "Password is strong"
+
+# Simple IP-based login rate limiter (in-memory, no extra dependencies)
+_login_attempts = defaultdict(list)  # {ip: [timestamp, ...]}
+MAX_LOGIN_ATTEMPTS = 5
+LOGIN_WINDOW_MINUTES = 1
+
+
+def _is_login_rate_limited(ip):
+    """Check if IP has exceeded login attempts in the time window."""
+    now = datetime.now()
+    cutoff = now - timedelta(minutes=LOGIN_WINDOW_MINUTES)
+    _login_attempts[ip] = [t for t in _login_attempts[ip] if t > cutoff]
+    return len(_login_attempts[ip]) >= MAX_LOGIN_ATTEMPTS
+
+
+def _record_login_attempt(ip):
+    _login_attempts[ip].append(datetime.now())
+
 
 # Crear el blueprint de autenticación
 auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
@@ -53,6 +72,11 @@ def login():
 
     form = LoginForm()
     if form.validate_on_submit():
+        client_ip = request.remote_addr or '0.0.0.0'
+        if _is_login_rate_limited(client_ip):
+            flash('Demasiados intentos. Espera un minuto antes de intentar de nuevo.', 'error')
+            return render_template('login.html', form=form)
+
         user = User.query.filter_by(username=form.username.data).first()
 
         if user and user.check_password(form.password.data):
@@ -66,6 +90,7 @@ def login():
             else:
                 flash('Error al iniciar sesión', 'error')
         else:
+            _record_login_attempt(client_ip)
             flash('Usuario o contraseña incorrectos', 'error')
 
     return render_template('login.html', form=form)
