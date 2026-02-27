@@ -59,7 +59,9 @@ class User(UserMixin, db.Model):
         return str(self.id)
         
     def to_dict(self):
-        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+        excluded = {'password_hash'}
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns
+                if c.name not in excluded}
 
 class Toy(db.Model):
     __tablename__ = 'toy'
