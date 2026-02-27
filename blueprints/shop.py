@@ -152,7 +152,9 @@ def advanced_search():
 
 def basic_search():
     """BÃºsqueda bÃ¡sica (fallback)"""
-    query = request.args.get('query', '').strip()
+    # Sanitize query: remove LIKE wildcards to prevent unintended matching
+    raw_query = request.args.get('query', '') or ''
+    query = raw_query.strip().replace('%', '').replace('_', '')
     toy_type = (request.args.get('toy_type') or request.args.get('category') or '').strip()
     # New filters
     age = request.args.get('age') or request.args.get('age_range') or ''
