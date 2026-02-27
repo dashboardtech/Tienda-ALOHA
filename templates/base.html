@@ -33,6 +33,146 @@
         } catch (e) {}
     })();
     </script>
+    <style>
+    /* Estilos del header */
+    .site-header {
+        background: rgba(76, 175, 80, 0.1);
+        padding: 1rem;
+        box-shadow: var(--box-shadow);
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        backdrop-filter: blur(10px);
+    }
+    .header-content {
+        max-width: 1200px;
+        margin: 0 auto;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .brand-link {
+        display: flex;
+        align-items: center;
+        text-decoration: none;
+        color: var(--text-color);
+        gap: 0.5rem;
+    }
+    .brand-logo {
+        width: 40px;
+        height: 40px;
+        object-fit: contain;
+    }
+    .brand-name {
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: var(--primary-color);
+    }
+    .desktop-nav {
+        flex: 1;
+        display: flex;
+        justify-content: center;
+        max-width: 800px;
+        margin: 0 auto;
+    }
+    .desktop-nav ul {
+        display: flex;
+        gap: 2rem;
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        justify-content: center;
+    }
+    .desktop-nav a {
+        text-decoration: none;
+        color: var(--text-color);
+        padding: 0.5rem 1rem;
+        border-radius: var(--border-radius);
+        transition: var(--transition);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .desktop-nav a:hover {
+        background: rgba(76, 175, 80, 0.1);
+        color: var(--primary-color);
+        transform: translateY(-2px);
+    }
+    .cart-link { position: relative; }
+    .cart-badge {
+        background-color: var(--primary-color);
+        color: #fff;
+        padding: 0.2rem 0.4rem;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: bold;
+        margin-left: 0.3rem;
+        display: inline-block;
+        min-width: 1.2rem;
+        text-align: center;
+    }
+    .mobile-nav {
+        display: none;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: var(--card-bg);
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+        padding: 0.8rem;
+        z-index: 1000;
+    }
+    .mobile-nav ul {
+        display: flex;
+        justify-content: space-around;
+        align-items: center;
+        list-style: none;
+        margin: 0;
+        padding: 0;
+    }
+    .mobile-nav a {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-decoration: none;
+        color: var(--text-color);
+        font-size: 1.5rem;
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        transition: var(--transition);
+    }
+    .mobile-nav a:hover {
+        background: rgba(76, 175, 80, 0.1);
+        color: var(--primary-color);
+    }
+    .cart-link-mobile { position: relative; }
+    .cart-badge-mobile {
+        background-color: var(--primary-color);
+        color: #fff;
+        padding: 0.1rem 0.3rem;
+        border-radius: 50%;
+        font-size: 0.65rem;
+        font-weight: bold;
+        position: absolute;
+        top: -5px;
+        right: -5px;
+        min-width: 1rem;
+        min-height: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    @media (max-width: 768px) {
+        .desktop-nav { display: none; }
+        .mobile-nav { display: block; }
+        .header-content { justify-content: center; }
+    }
+    @media (min-width: 769px) {
+        .header-content { padding: 0 2rem; }
+        .desktop-nav ul { flex-wrap: wrap; }
+    }
+    </style>
     {% block extra_head %}{% endblock %}
     {% block extra_css %}{% endblock %}
 </head>
@@ -158,13 +298,10 @@
         </ul>
     </nav>
 
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/mobile.js') }}"></script>
-    
-    <!-- Script de depuracion simplificado -->
+    <script defer src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script defer src="{{ url_for('static', filename='js/mobile.js') }}"></script>
+
     <script>
-        console.log('Script de depuracion cargado');
-        console.log('cart_count:', {{ cart_count|tojson|safe }});
         document.addEventListener('DOMContentLoaded', function() {
             try {
                 var homeLink = document.querySelector('.desktop-nav ul > li:first-child a');
@@ -198,184 +335,4 @@
     {% block scripts %}{% endblock %}
 </body>
 </html>
-
-<style>
-/* Estilos del header */
-.site-header {
-    background: rgba(76, 175, 80, 0.1);
-    padding: 1rem;
-    box-shadow: var(--box-shadow);
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    backdrop-filter: blur(10px);
-}
-
-.header-content {
-    max-width: 1200px;
-    margin: 0 auto;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.brand-link {
-    display: flex;
-    align-items: center;
-    text-decoration: none;
-    color: var(--text-color);
-    gap: 0.5rem;
-}
-
-.brand-logo {
-    width: 40px;
-    height: 40px;
-    object-fit: contain;
-}
-
-.brand-name {
-    font-size: 1.5rem;
-    font-weight: bold;
-    color: var(--primary-color);
-}
-
-/* Navegacion desktop */
-.desktop-nav {
-    flex: 1;
-    display: flex;
-    justify-content: center;
-    max-width: 800px;
-    margin: 0 auto;
-}
-
-.desktop-nav ul {
-    display: flex;
-    gap: 2rem;
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    justify-content: center;
-}
-
-.desktop-nav a {
-    text-decoration: none;
-    color: var(--text-color);
-    padding: 0.5rem 1rem;
-    border-radius: var(--border-radius);
-    transition: var(--transition);
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.desktop-nav a:hover {
-    background: rgba(76, 175, 80, 0.1);
-    color: var(--primary-color);
-    transform: translateY(-2px);
-}
-
-.cart-link {
-    position: relative;
-}
-
-.cart-badge {
-    background-color: var(--primary-color);
-    color: #fff;
-    padding: 0.2rem 0.4rem;
-    border-radius: 12px;
-    font-size: 0.75rem;
-    font-weight: bold;
-    margin-left: 0.3rem;
-    display: inline-block;
-    min-width: 1.2rem;
-    text-align: center;
-}
-
-/* Navegacion movil */
-.mobile-nav {
-    display: none;
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    background: var(--card-bg);
-    box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
-    padding: 0.8rem;
-    z-index: 1000;
-}
-
-.mobile-nav ul {
-    display: flex;
-    justify-content: space-around;
-    align-items: center;
-    list-style: none;
-    margin: 0;
-    padding: 0;
-}
-
-.mobile-nav a {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    text-decoration: none;
-    color: var(--text-color);
-    font-size: 1.5rem;
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
-    transition: var(--transition);
-}
-
-.mobile-nav a:hover {
-    background: rgba(76, 175, 80, 0.1);
-    color: var(--primary-color);
-}
-
-.cart-link-mobile {
-    position: relative;
-}
-
-.cart-badge-mobile {
-    background-color: var(--primary-color);
-    color: #fff;
-    padding: 0.1rem 0.3rem;
-    border-radius: 50%;
-    font-size: 0.65rem;
-    font-weight: bold;
-    position: absolute;
-    top: -5px;
-    right: -5px;
-    min-width: 1rem;
-    min-height: 1rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-/* Media queries */
-@media (max-width: 768px) {
-    .desktop-nav {
-        display: none;
-    }
-    
-    .mobile-nav {
-        display: block;
-    }
-    
-    .header-content {
-        justify-content: center;
-    }
-}
-
-@media (min-width: 769px) {
-    .header-content {
-        padding: 0 2rem;
-    }
-    
-    .desktop-nav ul {
-        flex-wrap: wrap;
-    }
-}
-</style>
-
 
