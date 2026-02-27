@@ -151,7 +151,9 @@ def create_app(config_class=None):
     try:
         from redis import Redis
         import rq
-        app.redis = Redis.from_url(app.config['REDIS_URL'])
+        _redis = Redis.from_url(app.config['REDIS_URL'])
+        _redis.ping()  # Force connection check — lazy connect fails later otherwise
+        app.redis = _redis
         app.task_queue = rq.Queue('aloha-tasks', connection=app.redis)
         cache.init_app(app, config={'CACHE_TYPE': 'redis', 'CACHE_REDIS_URL': app.config['REDIS_URL']})
     except Exception as e:
