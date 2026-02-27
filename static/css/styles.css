@@ -12,8 +12,11 @@
 
     /* Estados */
     --success-color: #388E3C;
+    --success-dark: #2E7D32;
     --warning-color: #F57C00;
     --error-color: #D32F2F;
+    --danger-color: #dc3545;
+    --danger-dark: #c82333;
     --info-color: #0288D1;
 
     /* Sombras */
@@ -565,22 +568,20 @@ body {
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 .admin-button.secondary {
-    background-color: #f8f9fa;
+    background-color: var(--card-bg);
     color: var(--text-color);
-    border: 1px solid #dee2e6;
+    border: 1px solid var(--border-color);
 }
 .admin-button.secondary:hover {
-    background-color: #e9ecef;
-    border-color: #ced4da;
+    background-color: var(--border-color);
 }
 .admin-button.danger {
-    background-color: #dc3545;
+    background-color: var(--danger-color);
     color: white;
 }
 .admin-button.danger:hover {
-    background-color: #c82333;
+    background-color: var(--danger-dark);
     transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(220,53,69,0.2);
 }
 
 /* Tamaños */
@@ -603,7 +604,6 @@ body {
     margin: 0.5rem 0;
 }
 .button-group .admin-button { margin: 0; }
-.admin-button.secondary:hover { background-color: #5a6268; }
 
 /* ------------------------------------------------------------------
    Loading Overlay
@@ -660,13 +660,13 @@ body {
     background-color: var(--secondary-color, #388E3C);
 }
 .order-actions .action-button.secondary {
-    background-color: #6c757d;
+    background-color: var(--text-light);
     color: white;
-    border-color: #6c757d;
+    border-color: var(--text-light);
 }
 .order-actions .action-button.secondary:hover {
-    background-color: #5a6268;
-    border-color: #545b62;
+    background-color: var(--text-color);
+    border-color: var(--text-color);
 }
 
 /* High-specificity control for Inicio icon only */
