@@ -418,25 +418,25 @@
 }
 
 .action-button.danger {
-    background: #dc3545;
+    background: var(--danger-color);
     color: white;
-    border-color: #dc3545;
+    border-color: var(--danger-color);
 }
 
 .action-button.danger:hover {
-    background: #c82333;
-    border-color: #bd2130;
+    background: var(--danger-dark);
+    border-color: var(--danger-dark);
 }
 
 .action-button.success {
-    background: #28a745;
+    background: var(--success-color);
     color: white;
-    border-color: #28a745;
+    border-color: var(--success-color);
 }
 
 .action-button.success:hover {
-    background: #218838;
-    border-color: #1e7e34;
+    background: var(--success-dark);
+    border-color: var(--success-dark);
 }
 
 .action-button.primary {
@@ -469,7 +469,7 @@
     transition: var(--transition-fast);
 }
 
-.btn-secondary:hover { background: #ccc; }
+.btn-secondary:hover { background: var(--text-light); color: white; }
 
 .inline-form {
     display: inline;
@@ -660,8 +660,8 @@
     font-weight: 500;
 }
 
-.status-badge.active { background: #d4edda; color: #155724; }
-.status-badge.inactive { background: #f8d7da; color: #721c24; }
+.status-badge.active { background: rgba(var(--primary-color-rgb), 0.15); color: var(--success-color); }
+.status-badge.inactive { background: rgba(210, 47, 47, 0.1); color: var(--danger-color); }
 
 /* ============================================
    RESPONSIVE
