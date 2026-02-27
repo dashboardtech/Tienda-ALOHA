@@ -940,7 +940,9 @@ def edit_toy(toy_id):
             db.session.rollback()
             current_app.logger.error(f'Error updating toy: {e}')
             flash('Error al actualizar el juguete.', 'error')
-            return jsonify({'success': False, 'message': str(e)}), 500 if request.headers.get('X-Requested-With') == 'XMLHttpRequest' else redirect(url_for('admin.dashboard'))
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({'success': False, 'message': 'Error al actualizar el juguete.'}), 500
+            return redirect(url_for('admin.dashboard'))
         
         return redirect(url_for('admin.dashboard'))
     

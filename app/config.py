@@ -56,21 +56,6 @@ class Config:
     MAX_LOGIN_ATTEMPTS = 5
     ACCOUNT_LOCKOUT_DURATION = 30  # minutes
     
-    # Two-Factor Authentication
-    ADMIN_2FA_REQUIRED = True
-    ADMIN_2FA_ISSUER = 'Tienditas-Aloha'
-    ADMIN_2FA_SECRET_LENGTH = 32
-    
-    # Age Verification
-    MIN_AGE = 8
-    MAX_AGE = 18
-    REQUIRE_PARENTAL_CONSENT = True
-    
-    # Transaction Limits
-    MAX_DAILY_TRANSACTION_AMOUNT = 50.0
-    MAX_SINGLE_TRANSACTION_AMOUNT = 20.0
-    MAX_DAILY_TRANSACTIONS = 10
-    
     # Security Headers
     SECURITY_HEADERS = {
         'X-Content-Type-Options': 'nosniff',

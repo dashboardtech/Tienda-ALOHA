@@ -15,7 +15,7 @@ from sqlalchemy.orm import selectinload
 from app.models import Toy, Order, OrderItem, User, Center
 from app.extensions import db
 from app.filters import format_currency
-from blueprints.auth import validate_password_strength
+from app.security import validate_password_strength
 
 # Crear el blueprint de usuario
 user_bp = Blueprint('user', __name__, url_prefix='/user')

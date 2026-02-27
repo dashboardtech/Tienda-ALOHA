@@ -402,7 +402,7 @@ def view_cart():
                 cart = cart_data.get('items', {})
             else:
                 cart = session.get('cart', {})
-        except:
+        except Exception:
             cart = session.get('cart', {})
     else:
         cart = session.get('cart', {})
@@ -915,7 +915,7 @@ def generate_pdf(order):
         if buffer:
             try:
                 buffer.close()
-            except:
+            except Exception:
                 pass
 
 @shop_bp.route('/order/<int:order_id>/pdf')

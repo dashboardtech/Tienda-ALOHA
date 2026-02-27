@@ -14,21 +14,9 @@ from datetime import datetime, timedelta, timezone
 # Importaciones absolutas
 from app.models import User, Center
 from app.extensions import db
+from app.security import validate_password_strength
 from app.utils.centers import collect_center_choices, normalize_center_slug
 from utils import normalize_email
-
-
-def validate_password_strength(password):
-    """Validate password meets security requirements"""
-    if len(password) < 8:
-        return False, "Password must be at least 8 characters long"
-    if not any(c.isupper() for c in password):
-        return False, "Password must contain at least one uppercase letter"
-    if not any(c.islower() for c in password):
-        return False, "Password must contain at least one lowercase letter"
-    if not any(c.isdigit() for c in password):
-        return False, "Password must contain at least one number"
-    return True, "Password is strong"
 
 # Simple IP-based login rate limiter (in-memory, no extra dependencies)
 _login_attempts = defaultdict(list)  # {ip: [timestamp, ...]}
@@ -59,7 +47,8 @@ class LoginForm(FlaskForm):
 
 class RegisterForm(FlaskForm):
     username = StringField('Username', validators=[DataRequired(), Length(min=4, max=80)])
-    email = StringField('Email', validators=[DataRequired(), Email()])
+    email = StringField('Email', validators=[DataRequired(), Email()],
+                        filters=[lambda v: v.strip() if v else v])
     password = PasswordField('Password', validators=[DataRequired(), Length(min=8)])
     center = SelectField('Center', validators=[DataRequired()], choices=[])
 
