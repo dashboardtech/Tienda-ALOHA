@@ -3,7 +3,7 @@ Blueprint para manejo de autenticación de usuarios
 Incluye: login, logout, registro
 """
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, session
 from flask_login import login_user, login_required, logout_user, current_user
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SelectField
@@ -59,7 +59,8 @@ def login():
             user.last_login = datetime.now()
             db.session.commit()
 
-            if login_user(user, remember=True):
+            remember = bool(request.form.get('remember'))
+            if login_user(user, remember=remember):
                 flash('¡Bienvenido de nuevo!', 'success')
                 return redirect(url_for('shop.index'))
             else:
@@ -74,6 +75,7 @@ def login():
 @login_required
 def logout():
     """Cerrar sesión del usuario"""
+    session.clear()
     logout_user()
     return redirect(url_for('shop.index'))
 
@@ -138,8 +140,9 @@ def force_password_change():
     if request.method == 'POST':
         new_password = request.form.get('new_password', '')
         confirm_password = request.form.get('confirm_password', '')
-        if not new_password or len(new_password) < 8:
-            flash('La nueva contraseña debe tener al menos 8 caracteres.', 'error')
+        is_valid, msg = validate_password_strength(new_password)
+        if not new_password or not is_valid:
+            flash(msg if new_password else 'La nueva contraseña es requerida.', 'error')
             return render_template('force_password_change.html')
         if new_password != confirm_password:
             flash('Las contraseñas no coinciden.', 'error')
