@@ -134,7 +134,6 @@ function initAdminPanel() {
                             Swal.fire('Error', 'No se pudo eliminar el juguete.', 'error');
                         }
                     }).catch(error => {
-                        console.error('Error:', error);
                         Swal.fire('Error', 'No se pudo eliminar el juguete.', 'error');
                     });
                 }
@@ -185,7 +184,6 @@ function initAdminPanel() {
                 }
             })
             .catch(error => {
-                console.error('Error:', error);
                 hideLoading();
                 Swal.fire('Error', 'No se pudo actualizar el juguete.', 'error');
             });
@@ -216,7 +214,6 @@ function initAdminPanel() {
                 alert('Error al eliminar el juguete');
                 }
             }).catch(error => {
-                console.error('Error:', error);
                 hideLoading();
                 alert('Error al eliminar el juguete');
             });
@@ -227,7 +224,6 @@ function initAdminPanel() {
     function openEditModal(toyId) {
         const editModal = document.getElementById('editToyModal');
         if (!editModal) {
-            console.error('Error: No se encontro el modal de edicion');
             return;
         }
         
@@ -261,7 +257,6 @@ function initAdminPanel() {
                 hideLoading();
             })
             .catch(error => {
-                console.error('Error:', error);
                 hideLoading();
             alert('Error al cargar los datos del juguete');
             });
@@ -354,7 +349,6 @@ function editToy(toyId) {
     .catch(error => {
         hideLoading();
         showToast('Error al cargar datos del juguete', 'error');
-        console.error('Error:', error);
     });
 }
 
@@ -384,7 +378,6 @@ function deleteToy(toyId, toyName) {
         .catch(error => {
             hideLoading();
             showToast('Error al eliminar juguete', 'error');
-            console.error('Error:', error);
         });
     }
 }
@@ -421,7 +414,6 @@ function saveToyEdit() {
     .catch(error => {
         hideLoading();
         showToast('Error al actualizar juguete', 'error');
-        console.error('Error:', error);
     });
 }
 
@@ -501,36 +493,13 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-// Funcion auxiliar para obtener token CSRF
-function getCsrfToken() {
-    return document.querySelector('meta[name="csrf-token"]').getAttribute('content') || 
-           document.querySelector('input[name="csrf_token"]').value;
-}
-
-// Funcion auxiliar para mostrar loading
-function showLoading() {
-    const loading = document.createElement('div');
-    loading.id = 'loading-overlay';
-    loading.innerHTML = '<div class="loading-spinner">⏳ Cargando...</div>';
-    document.body.appendChild(loading);
-}
-
-function hideLoading() {
-    const loading = document.getElementById('loading-overlay');
-    if (loading) loading.remove();
-}
-
 // ===== FUNCION SIMPLE PARA BORRAR JUGUETES =====
 function deleteToySimple(button) {
-    console.log('🗑️ Iniciando eliminacion simple de juguete');
     
     const toyId = button.getAttribute('data-toy-id');
     const toyName = button.getAttribute('data-toy-name');
     
-    console.log(`🎯 Eliminando juguete ID: ${toyId}, Nombre: ${toyName}`);
-    
     if (!toyId) {
-        console.error('❌ No se encontro el ID del juguete');
         alert('Error: No se pudo identificar el juguete');
         return;
     }
@@ -538,16 +507,12 @@ function deleteToySimple(button) {
     // Confirmar eliminacion
     const confirmMessage = `Estas seguro de que quieres eliminar el juguete "${toyName}"?\n\nEsta accion no se puede deshacer.`;
     if (!confirm(confirmMessage)) {
-        console.log('🚫 Eliminacion cancelada por el usuario');
         return;
     }
-    
-    console.log('📡 Enviando request de eliminacion...');
     
     // Obtener CSRF token
     const csrfToken = document.querySelector('meta[name=csrf-token]')?.getAttribute('content');
     if (!csrfToken) {
-        console.error('❌ No se encontro el token CSRF');
         alert('Error: Token de seguridad no encontrado');
         return;
     }
@@ -565,25 +530,20 @@ function deleteToySimple(button) {
         body: formData
     })
     .then(response => {
-        console.log(`📊 Respuesta de eliminacion: ${response.status}`);
         return response.json();
     })
     .then(data => {
-        console.log('📋 Datos de respuesta:', data);
         
         if (data.success) {
-            console.log('✅ Juguete eliminado exitosamente');
             alert('Juguete eliminado exitosamente');
             
             // Recargar la pagina para actualizar la lista
             window.location.reload();
         } else {
-            console.error('❌ Error en eliminacion:', data.message);
             alert(`Error: ${data.message || 'No se pudo eliminar el juguete'}`);
         }
     })
     .catch(error => {
-        console.error('❌ Error en fetch:', error);
         alert('Error de conexion. Por favor, intenta nuevamente.');
     });
 }

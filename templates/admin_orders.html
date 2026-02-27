@@ -2,6 +2,10 @@
 
 {% block title %}📋 Todas las Ordenes - Panel de Administracion{% endblock %}
 
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+{% endblock %}
+
 {% block content %}
 <div class="admin-container">
     <div class="admin-header">
@@ -12,15 +16,13 @@
         </a>
     </div>
 
-    <!-- Filtros y busqueda -->
     <div class="admin-filters">
         <form method="GET" class="search-form">
             <div class="form-group">
-                <input type="text" name="search" value="{{ search_query }}" 
+                <input type="text" name="search" value="{{ search_query }}"
                        placeholder="Buscar por ID, usuario o email..." class="search-input">
                 <button type="submit" class="search-button">🔍 Buscar</button>
             </div>
-            
             <div class="form-group">
                 <label for="status">Filtrar por estado:</label>
                 <select name="status" id="status" class="status-select" onchange="this.form.submit()">
@@ -34,7 +36,6 @@
         </form>
     </div>
 
-    <!-- Resumen de estadisticas -->
     <div class="stats-summary">
         <div class="stat-card">
             <span class="stat-label">Total de Ordenes</span>
@@ -42,7 +43,6 @@
         </div>
     </div>
 
-    <!-- Lista de ordenes -->
     <div class="admin-orders-list" data-reset-url="{{ url_for('admin.all_orders') }}">
         {% if orders.items %}
             {% for order in orders.items %}
@@ -56,12 +56,12 @@
                             </span>
                         </div>
                         <div class="order-user">
-                            <span class="user-name">👤 {{ order.user.username }}</span>
-                            <span class="user-email">✉️ {{ order.user.email or 'Sin correo' }}</span>
-                            <span class="user-center">🏪 {{ order.user.center }}</span>
+                            <span class="order-user-name">👤 {{ order.user.username }}</span>
+                            <span class="order-user-email">✉️ {{ order.user.email or 'Sin correo' }}</span>
+                            <span class="order-user-center">🏪 {{ order.user.center }}</span>
                         </div>
                     </div>
-                    
+
                     <div class="order-details">
                         <div class="items-summary">
                             {% for item in order.items %}
@@ -72,13 +72,13 @@
                                 </div>
                             {% endfor %}
                         </div>
-                        
+
                         <div class="order-total">
                             <span>Total:</span>
                             <span class="total-amount">{{ format_currency(order.total_price) }}</span>
                         </div>
                     </div>
-                    
+
                     <div class="order-actions">
                         <a href="{{ url_for('shop.order_summary', order_id=order.id) }}" class="action-button" target="_blank">
                             Ver Detalles
@@ -97,8 +97,7 @@
                     </div>
                 </div>
             {% endfor %}
-            
-            <!-- Paginacion -->
+
             {% if orders.pages > 1 %}
                 <div class="pagination">
                     {% if orders.has_prev %}
@@ -106,11 +105,9 @@
                             &laquo; Anterior
                         </a>
                     {% endif %}
-                    
                     <span class="current-page">
                         Pagina {{ orders.page }} de {{ orders.pages }}
                     </span>
-                    
                     {% if orders.has_next %}
                         <a href="{{ url_for('admin.all_orders', page=orders.next_num, search=search_query, status=status_filter) }}" class="page-link">
                             Siguiente &raquo;
@@ -118,7 +115,7 @@
                     {% endif %}
                 </div>
             {% endif %}
-            
+
         {% else %}
             <div class="no-results">
                 <p>No se encontraron ordenes que coincidan con los criterios de busqueda.</p>
@@ -130,352 +127,76 @@
     </div>
 </div>
 
+<!-- Empty state template (used by JS when all orders are cancelled) -->
+<template id="empty-state-template">
+    <div class="no-results">
+        <p>No se encontraron ordenes que coincidan con los criterios de búsqueda.</p>
+        <a class="action-button empty-state-link">Limpiar filtros</a>
+    </div>
+</template>
+
 <style>
-/* Estilos generales */
-.admin-container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 2rem 1rem;
-}
-
-.admin-header {
-    margin-bottom: 2rem;
-    text-align: center;
-}
-
-.admin-header h1 {
-    color: var(--primary-color);
-    margin-bottom: 0.5rem;
-}
-
-.back-link {
-    display: inline-block;
-    margin-top: 1rem;
-    color: var(--primary-color);
-    text-decoration: none;
-    font-weight: 500;
-}
-
-.back-link:hover {
-    text-decoration: underline;
-}
-
-/* Filtros y busqueda */
-.admin-filters {
-    background: var(--card-bg);
-    padding: 1.5rem;
-    border-radius: 10px;
-    margin-bottom: 2rem;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-}
-
-.search-form {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1rem;
-    align-items: flex-end;
-}
-
-.form-group {
-    flex: 1;
-    min-width: 200px;
-}
-
-.search-input {
-    width: 100%;
-    padding: 0.75rem 1rem;
-    border: 1px solid var(--border-color);
-    border-radius: 5px;
-    font-size: 1rem;
-}
-
-.search-button {
-    background: var(--primary-color);
-    color: white;
-    border: none;
-    padding: 0.75rem 1.5rem;
-    border-radius: 5px;
-    cursor: pointer;
-    font-weight: 500;
-    transition: background-color 0.2s;
-}
-
-.search-button:hover {
-    background: var(--primary-dark);
-}
-
-.status-select {
-    width: 100%;
-    padding: 0.75rem;
-    border: 1px solid var(--border-color);
-    border-radius: 5px;
-    background: white;
-    font-size: 1rem;
-    cursor: pointer;
-}
-
-/* Estadisticas */
-.stats-summary {
-    display: flex;
-    gap: 1rem;
-    margin-bottom: 2rem;
-    flex-wrap: wrap;
-}
-
-.stat-card {
-    background: var(--primary-color);
-    color: white;
-    padding: 1.5rem;
-    border-radius: 10px;
-    text-align: center;
-    flex: 1;
-    min-width: 200px;
-}
-
-.stat-label {
-    display: block;
-    font-size: 0.9rem;
-    margin-bottom: 0.5rem;
-    opacity: 0.9;
-}
-
-.stat-value {
-    font-size: 1.8rem;
-    font-weight: bold;
-}
-
-/* Lista de ordenes */
-.admin-orders-list {
-    margin-top: 1.5rem;
-}
-
+/* Page-specific: order cards */
 .order-card {
     background: var(--card-bg);
-    border-radius: 10px;
+    border-radius: var(--border-radius);
     padding: 1.5rem;
     margin-bottom: 1.5rem;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    box-shadow: var(--shadow-sm);
     border: 1px solid var(--border-color);
 }
 
 .order-header {
-    display: flex;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-    padding-bottom: 1rem;
+    display: flex; justify-content: space-between; flex-wrap: wrap;
+    gap: 1rem; margin-bottom: 1.5rem; padding-bottom: 1rem;
     border-bottom: 1px solid var(--border-color);
 }
 
-.order-info h3 {
-    margin: 0 0 0.5rem 0;
-    color: var(--primary-color);
-}
-
-.order-date {
-    color: var(--text-muted);
-    font-size: 0.9rem;
-    display: block;
-    margin-bottom: 0.5rem;
-}
+.order-info h3 { margin: 0 0 0.5rem; color: var(--primary-color); }
+.order-date { color: var(--text-light); font-size: 0.9rem; display: block; margin-bottom: 0.5rem; }
 
 .order-status {
-    display: inline-block;
-    padding: 0.25rem 0.75rem;
-    border-radius: 20px;
-    font-size: 0.8rem;
-    font-weight: 500;
-    text-transform: capitalize;
+    display: inline-block; padding: 0.25rem 0.75rem; border-radius: 20px;
+    font-size: 0.8rem; font-weight: 500; text-transform: capitalize;
 }
+.status-pending    { background: #fff3cd; color: #856404; }
+.status-processing { background: #cce5ff; color: #004085; }
+.status-completed  { background: #d4edda; color: #155724; }
+.status-cancelled  { background: #f8d7da; color: #721c24; }
 
-.status-pending {
-    background: #fff3cd;
-    color: #856404;
+.order-user { text-align: right; }
+.order-user-name, .order-user-email, .order-user-center {
+    display: block; margin-bottom: 0.25rem; font-size: 0.9rem;
 }
+.order-user-email { color: var(--text-light); }
 
-.status-processing {
-    background: #cce5ff;
-    color: #004085;
-}
-
-.status-completed {
-    background: #d4edda;
-    color: #155724;
-}
-
-.status-cancelled {
-    background: #f8d7da;
-    color: #721c24;
-}
-
-.order-user {
-    text-align: right;
-}
-
-.user-name, .user-email, .user-center {
-    display: block;
-    margin-bottom: 0.25rem;
-    font-size: 0.9rem;
-}
-
-.user-email {
-    color: var(--text-muted);
-}
-
-.order-details {
-    margin-bottom: 1.5rem;
-}
-
-.items-summary {
-    margin-bottom: 1rem;
-}
-
+.order-details { margin-bottom: 1.5rem; }
+.items-summary { margin-bottom: 1rem; }
 .order-item {
-    display: flex;
-    justify-content: space-between;
-    padding: 0.5rem 0;
-    border-bottom: 1px dashed var(--border-color);
+    display: flex; justify-content: space-between;
+    padding: 0.5rem 0; border-bottom: 1px dashed var(--border-color);
 }
-
-.order-item:last-child {
-    border-bottom: none;
-}
-
-.item-name {
-    flex: 2;
-}
-
-.item-quantity {
-    flex: 1;
-    text-align: center;
-}
-
-.item-price {
-    flex: 1;
-    text-align: right;
-}
+.order-item:last-child { border-bottom: none; }
+.item-name { flex: 2; }
+.item-quantity { flex: 1; text-align: center; }
+.item-price { flex: 1; text-align: right; }
 
 .order-total {
-    display: flex;
-    justify-content: space-between;
-    font-weight: bold;
-    font-size: 1.1rem;
-    padding-top: 1rem;
-    margin-top: 1rem;
+    display: flex; justify-content: space-between;
+    font-weight: bold; font-size: 1.1rem;
+    padding-top: 1rem; margin-top: 1rem;
     border-top: 2px solid var(--border-color);
 }
 
-.order-actions {
-    display: flex;
-    gap: 1rem;
-    justify-content: flex-end;
-}
+.order-actions { display: flex; gap: 1rem; justify-content: flex-end; }
 
-.action-button {
-    padding: 0.5rem 1.25rem;
-    border-radius: 5px;
-    text-decoration: none;
-    font-weight: 500;
-    font-size: 0.9rem;
-    transition: all 0.2s;
-    text-align: center;
-}
-
-.action-button {
-    background: var(--primary-color);
-    color: white;
-    border: 2px solid var(--primary-color);
-}
-
-.action-button:hover {
-    background: var(--primary-dark);
-    border-color: var(--primary-dark);
-    color: white;
-    transform: translateY(-2px);
-}
-
-.action-button.secondary {
-    background: transparent;
-    color: var(--primary-color);
-    border: 2px solid var(--primary-color);
-}
-
-.action-button.secondary:hover {
-    background: rgba(76, 175, 80, 0.1);
-}
-
-.action-button.danger {
-    background: #f44336;
-    border-color: #f44336;
-}
-
-.action-button.danger:hover {
-    background: #d32f2f;
-    border-color: #d32f2f;
-}
-
-/* Paginacion */
-.pagination {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 1rem;
-    margin-top: 2rem;
-    padding: 1rem 0;
-}
-
-.page-link {
-    padding: 0.5rem 1rem;
-    border-radius: 5px;
-    background: var(--primary-color);
-    color: white;
-    text-decoration: none;
-    transition: background-color 0.2s;
-}
-
-.page-link:hover {
-    background: var(--primary-dark);
-}
-
-.current-page {
-    font-weight: 500;
-    color: var(--text-muted);
-}
-
-/* Sin resultados */
-.no-results {
-    text-align: center;
-    padding: 3rem 1rem;
-    background: var(--card-bg);
-    border-radius: 10px;
-    border: 1px dashed var(--border-color);
-}
-
-.no-results p {
-    margin-bottom: 1.5rem;
-    color: var(--text-muted);
-}
-
-/* Responsive */
 @media (max-width: 768px) {
-    .order-header {
-        flex-direction: column;
-    }
-    
-    .order-user {
-        text-align: left;
-        margin-top: 1rem;
-    }
-    
-    .order-actions {
-        flex-direction: column;
-    }
-    
-    .action-button {
-        width: 100%;
-    }
+    .order-header { flex-direction: column; }
+    .order-user { text-align: left; margin-top: 1rem; }
+    .order-actions { flex-direction: column; }
+    .order-actions .action-button { width: 100%; }
 }
+</style>
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -485,15 +206,11 @@ document.addEventListener('DOMContentLoaded', function () {
             event.preventDefault();
 
             const orderId = form.getAttribute('action').split('/').filter(Boolean).pop();
-            const confirmed = window.confirm(`¿Seguro que deseas cancelar la orden #${orderId}? Se reembolsará al comprador y se restaurará el inventario.`);
-            if (!confirmed) {
-                return;
-            }
+            const confirmed = window.confirm('¿Seguro que deseas cancelar la orden #' + orderId + '? Se reembolsará al comprador y se restaurará el inventario.');
+            if (!confirmed) return;
 
             const submitButton = form.querySelector('button[type="submit"]');
-            if (submitButton) {
-                submitButton.disabled = true;
-            }
+            if (submitButton) submitButton.disabled = true;
 
             const formData = new FormData(form);
             const csrfToken = formData.get('csrf_token');
@@ -501,10 +218,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 'X-Requested-With': 'XMLHttpRequest',
                 'Accept': 'application/json'
             };
-
-            if (csrfToken) {
-                headers['X-CSRFToken'] = csrfToken;
-            }
+            if (csrfToken) headers['X-CSRFToken'] = csrfToken;
 
             try {
                 const response = await fetch(form.action, {
@@ -513,64 +227,47 @@ document.addEventListener('DOMContentLoaded', function () {
                     headers
                 });
 
-                let data = null;
-                try {
-                    data = await response.json();
-                } catch (parseError) {
-                    data = null;
-                }
+                var data = null;
+                try { data = await response.json(); } catch (e) { data = null; }
 
                 if (!response.ok) {
-                    const message = data && data.message ? data.message : 'Ha ocurrido un error al cancelar la orden.';
-                    const level = data && data.level === 'warning' ? 'warning' : 'error';
-                    throw { message, level };
+                    var message = data && data.message ? data.message : 'Ha ocurrido un error al cancelar la orden.';
+                    var level = data && data.level === 'warning' ? 'warning' : 'error';
+                    throw { message: message, level: level };
                 }
 
                 if (!data || data.success !== true) {
-                    const message = data && data.message ? data.message : 'No fue posible cancelar la orden.';
-                    const level = data && data.level === 'warning' ? 'warning' : 'error';
-                    throw { message, level };
+                    var msg = data && data.message ? data.message : 'No fue posible cancelar la orden.';
+                    var lvl = data && data.level === 'warning' ? 'warning' : 'error';
+                    throw { message: msg, level: lvl };
                 }
 
-                const message = data.message || 'Orden cancelada correctamente.';
-                if (typeof showToast === 'function') {
-                    showToast(message, 'success');
-                }
+                var successMsg = data.message || 'Orden cancelada correctamente.';
+                if (typeof showToast === 'function') showToast(successMsg, 'success');
 
-                const orderCard = form.closest('.order-card');
-                if (orderCard) {
-                    orderCard.remove();
-                }
+                var orderCard = form.closest('.order-card');
+                if (orderCard) orderCard.remove();
 
-                const remainingCards = document.querySelectorAll('.order-card');
+                var remainingCards = document.querySelectorAll('.order-card');
                 if (remainingCards.length === 0) {
-                    const ordersList = document.querySelector('.admin-orders-list');
+                    var ordersList = document.querySelector('.admin-orders-list');
                     if (ordersList && !ordersList.querySelector('.no-results')) {
-                        const emptyState = document.createElement('div');
-                        emptyState.className = 'no-results';
-                        emptyState.innerHTML = `
-                            <p>No se encontraron ordenes que coincidan con los criterios de búsqueda.</p>
-                            <a href="${ordersList.getAttribute('data-reset-url') || '#'}" class="action-button">
-                                Limpiar filtros
-                            </a>
-                        `;
-                        ordersList.appendChild(emptyState);
+                        var tpl = document.getElementById('empty-state-template');
+                        var clone = tpl.content.cloneNode(true);
+                        var link = clone.querySelector('.empty-state-link');
+                        if (link) link.href = ordersList.getAttribute('data-reset-url') || '#';
+                        ordersList.appendChild(clone);
                     }
                 }
             } catch (error) {
-                const message = error && error.message ? error.message : 'No fue posible cancelar la orden.';
-                const level = error && error.level === 'warning' ? 'warning' : 'error';
-                if (typeof showToast === 'function') {
-                    showToast(message, level);
-                }
+                var errMsg = error && error.message ? error.message : 'No fue posible cancelar la orden.';
+                var errLevel = error && error.level === 'warning' ? 'warning' : 'error';
+                if (typeof showToast === 'function') showToast(errMsg, errLevel);
             } finally {
-                if (submitButton) {
-                    submitButton.disabled = false;
-                }
+                if (submitButton) submitButton.disabled = false;
             }
         });
     });
 });
 </script>
-</style>
 {% endblock %}

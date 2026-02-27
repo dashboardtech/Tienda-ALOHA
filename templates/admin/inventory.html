@@ -1,6 +1,10 @@
-﻿{% extends 'base.html' %}
+{% extends 'base.html' %}
 
 {% block title %}Gestion de Inventario{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+{% endblock %}
 
 {% block content %}
 <div class="admin-container">
@@ -16,7 +20,6 @@
         </div>
     </div>
 
-    <!-- Filtros y Busqueda -->
     <div class="filter-section">
         <input type="text" id="toySearch" placeholder="Buscar juguetes..." class="search-input">
         <select id="categoryFilter" class="filter-select">
@@ -27,7 +30,6 @@
         </select>
     </div>
 
-    <!-- Grid de Juguetes -->
     <div class="toys-grid">
         {% for toy in toys %}
         <div class="toy-card" id="toy-{{ toy.id }}">
@@ -179,7 +181,7 @@
                     <span>No hay centros configurados.</span>
                 {% endif %}
             </div>
-            <div class="form-actions" style="margin-top:1rem;display:flex;gap:.5rem;justify-content:flex-end;">
+            <div class="form-actions" style="margin-top:1rem;">
                 <button type="button" class="btn-secondary" onclick="closeModal('editCentersModal')">Cancelar</button>
                 <button type="button" class="btn-primary" onclick="saveCenters()">Guardar</button>
             </div>
@@ -188,55 +190,7 @@
 </div>
 
 <style>
-/* Modales responsivos */
-.modal {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.5);
-    display: none;
-    align-items: center;
-    justify-content: center;
-    padding: 1rem;
-    z-index: 1000;
-}
-.modal-content {
-    background: var(--card-bg);
-    color: var(--text-color);
-    width: 100%;
-    max-width: 520px;
-    border-radius: 12px;
-    box-shadow: var(--box-shadow);
-    padding: 1rem 1.2rem;
-    max-height: 90vh;
-    overflow: auto;
-}
-.form-actions { display:flex; gap:.5rem; justify-content:flex-end; }
-.btn-primary {
-    background: var(--primary-color);
-    color: #fff;
-    border: none;
-    padding: .6rem 1rem;
-    border-radius: 8px;
-    cursor: pointer;
-}
-.btn-secondary {
-    background: #e0e0e0;
-    color: #222;
-    border: none;
-    padding: .6rem 1rem;
-    border-radius: 8px;
-    cursor: pointer;
-}
-@media (max-width: 480px) {
-    .modal-content { max-width: 100%; padding: 1rem; }
-}
-
-.admin-container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 2rem;
-}
-
+/* Page-specific: toy card grid and image overlays */
 .toys-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
@@ -246,121 +200,48 @@
 
 .toy-card {
     background: var(--card-bg);
-    border-radius: 10px;
+    border-radius: var(--border-radius);
     overflow: hidden;
-    box-shadow: var(--box-shadow);
+    box-shadow: var(--shadow-sm);
     transition: transform 0.2s;
 }
+.toy-card:hover { transform: translateY(-4px); }
 
-.toy-card:hover {
-    transform: translateY(-5px);
-}
-
-.toy-image {
-    position: relative;
-    padding-top: 75%;
-}
-
+.toy-image { position: relative; padding-top: 75%; }
 .toy-image img {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+    position: absolute; top: 0; left: 0;
+    width: 100%; height: 100%; object-fit: cover;
 }
 
 .stock-controls {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    display: flex;
-    align-items: center;
-    gap: 0.3rem;
+    position: absolute; top: 10px; right: 10px;
+    display: flex; align-items: center; gap: 0.3rem;
 }
-
 .stock-btn {
-    background: rgba(0, 0, 0, 0.6);
-    color: #fff;
-    border: none;
-    width: 24px;
-    height: 24px;
-    border-radius: 4px;
-    cursor: pointer;
+    background: rgba(0, 0, 0, 0.6); color: #fff;
+    border: none; width: 24px; height: 24px;
+    border-radius: 4px; cursor: pointer;
 }
-
 .stock-count {
-    background: rgba(0, 0, 0, 0.6);
-    color: #fff;
-    padding: 0 0.4rem;
-    border-radius: 4px;
-    font-size: 0.9rem;
+    background: rgba(0, 0, 0, 0.6); color: #fff;
+    padding: 0 0.4rem; border-radius: 4px; font-size: 0.9rem;
 }
+.delete-btn { background: rgba(244, 67, 54, 0.8); }
 
-.delete-btn {
-    background: rgba(244, 67, 54, 0.8);
-}
-
-.toy-info {
-    padding: 1rem;
-}
-
-.toy-info h3 {
-    margin: 0;
-    font-size: 1.2rem;
-    color: var(--primary-color);
-}
-
-.toy-price {
-    font-weight: bold;
-    color: var(--secondary-color);
-}
-
-.toy-category {
-    font-size: 0.9rem;
-    color: var(--text-color);
-    opacity: 0.8;
-}
-
-.toy-description {
-    font-size: 0.9rem;
-    margin-top: 0.5rem;
-    color: var(--text-color);
-}
+.toy-info { padding: 1rem; }
+.toy-info h3 { margin: 0; font-size: 1.2rem; color: var(--primary-color); }
+.toy-price { font-weight: bold; color: var(--secondary-color); }
+.toy-category { font-size: 0.9rem; color: var(--text-color); opacity: 0.8; }
+.toy-description { font-size: 0.9rem; margin-top: 0.5rem; color: var(--text-color); }
 
 .toy-centers { margin-top: .5rem; display: flex; flex-wrap: wrap; gap: .3rem; }
 .center-chip {
-    display: inline-block;
-    background: rgba(0,0,0,0.06);
-    color: var(--text-color);
-    border: 1px solid rgba(0,0,0,0.08);
-    border-radius: 12px;
-    padding: .15rem .5rem;
-    font-size: .8rem;
+    display: inline-block; background: rgba(0,0,0,0.06);
+    color: var(--text-color); border: 1px solid rgba(0,0,0,0.08);
+    border-radius: 12px; padding: .15rem .5rem; font-size: .8rem;
 }
 .center-chip.center-all {
-    background: rgba(76,175,80,0.08);
-    border-color: rgba(76,175,80,0.2);
-}
-
-.form-group textarea {
-    width: 100%;
-    min-height: 100px;
-    padding: 0.5rem;
-    border: 1px solid var(--border-color);
-    border-radius: 5px;
-    background: var(--input-bg);
-    color: var(--text-color);
-    resize: vertical;
-}
-
-.form-group input[type="file"] {
-    padding: 0.5rem;
-    border: 1px solid var(--border-color);
-    border-radius: 5px;
-    background: var(--input-bg);
-    color: var(--text-color);
-    width: 100%;
+    background: rgba(46,125,50,0.08); border-color: rgba(46,125,50,0.2);
 }
 </style>
 
@@ -375,36 +256,23 @@ function closeModal(modalId) {
     if (m) m.style.display = 'none';
 }
 
-// Manejo del formulario de agregar juguete
 document.getElementById('addToyForm').onsubmit = async function(e) {
     e.preventDefault();
     const formData = new FormData(this);
     formData.set('stock', document.getElementById('toyStock').value);
     formData.set('csrf_token', document.querySelector('input[name="csrf_token"]').value);
     try {
-        const response = await fetch('/admin/toys/add', {
-            method: 'POST',
-            body: formData
-        });
-        if (response.ok) {
-            closeModal('addToyModal');
-            location.reload();
-        } else {
-            alert('Error al guardar el juguete');
-        }
-    } catch (error) {
-        console.error('Error:', error);
-        alert('Error al guardar el juguete');
-    }
+        const response = await fetch('/admin/toys/add', { method: 'POST', body: formData });
+        if (response.ok) { closeModal('addToyModal'); location.reload(); }
+        else { alert('Error al guardar el juguete'); }
+    } catch (error) { console.error('Error:', error); alert('Error al guardar el juguete'); }
 };
 
-// Modal Editar Juguete
 async function showEditToyModal(toyId) {
     try {
         const resp = await fetch(`/admin/edit_toy/${toyId}`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
         if (!resp.ok) throw new Error('No se pudo cargar el juguete');
         const toy = await resp.json();
-        // Poblar campos
         document.getElementById('editToyId').value = toy.id;
         document.getElementById('editToyName').value = toy.name || '';
         document.getElementById('editToyDescription').value = toy.description || '';
@@ -413,9 +281,7 @@ async function showEditToyModal(toyId) {
         if (sel) sel.value = (toy.category || '');
         document.getElementById('editToyStock').value = toy.stock != null ? toy.stock : '';
         document.getElementById('editToyModal').style.display = 'flex';
-    } catch (e) {
-        alert(e.message || 'Error cargando juguete');
-    }
+    } catch (e) { alert(e.message || 'Error cargando juguete'); }
 }
 
 document.getElementById('editToyForm').onsubmit = async function(e) {
@@ -425,13 +291,10 @@ document.getElementById('editToyForm').onsubmit = async function(e) {
     form.set('csrf_token', getCsrfToken());
     try {
         const resp = await fetch(`/admin/edit_toy/${toyId}`, {
-            method: 'POST',
-            headers: { 'X-Requested-With': 'XMLHttpRequest' },
-            body: form
+            method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: form
         });
         const data = await resp.json().catch(() => ({}));
         if (!resp.ok || data.success === false) throw new Error((data && data.message) || 'Error al actualizar');
-        // Actualizar tarjeta en UI
         const card = document.getElementById(`toy-${toyId}`);
         if (card) {
             const nameEl = card.querySelector('h3');
@@ -446,29 +309,21 @@ document.getElementById('editToyForm').onsubmit = async function(e) {
             if (catEl) catEl.textContent = form.get('category') || '';
         }
         closeModal('editToyModal');
-    } catch (err) {
-        alert(err.message || 'Error al guardar cambios');
-    }
+    } catch (err) { alert(err.message || 'Error al guardar cambios'); }
 }
 
-// Busqueda y filtrado
 document.getElementById('toySearch').oninput = function(e) {
     const searchTerm = e.target.value.toLowerCase();
-    const cards = document.querySelectorAll('.toy-card');
-    
-    cards.forEach(card => {
+    document.querySelectorAll('.toy-card').forEach(card => {
         const name = card.querySelector('h3').textContent.toLowerCase();
-        const description = card.querySelector('.toy-description').textContent.toLowerCase();
-        const matches = name.includes(searchTerm) || description.includes(searchTerm);
-        card.style.display = matches ? 'block' : 'none';
+        const desc = card.querySelector('.toy-description').textContent.toLowerCase();
+        card.style.display = (name.includes(searchTerm) || desc.includes(searchTerm)) ? 'block' : 'none';
     });
 };
 
 document.getElementById('categoryFilter').onchange = function(e) {
     const category = e.target.value;
-    const cards = document.querySelectorAll('.toy-card');
-
-    cards.forEach(card => {
+    document.querySelectorAll('.toy-card').forEach(card => {
         const toyCategory = card.querySelector('.toy-category').textContent;
         card.style.display = (category === 'all' || toyCategory === category) ? 'block' : 'none';
     });
@@ -482,78 +337,48 @@ async function adjustStock(toyId, delta) {
     try {
         const response = await fetch(`/admin/toys/${toyId}/stock`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCsrfToken()
-            },
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
             body: JSON.stringify({ delta: delta })
         });
         const data = await response.json();
         if (data.success) {
             const el = document.getElementById(`stock-${toyId}`);
             if (el) el.textContent = data.stock;
-        } else {
-            alert(data.message || 'Error actualizando stock');
-        }
-    } catch (error) {
-        console.error('Error:', error);
-        alert('Error actualizando stock');
-    }
+        } else { alert(data.message || 'Error actualizando stock'); }
+    } catch (error) { console.error('Error:', error); alert('Error actualizando stock'); }
 }
 
 async function deleteToy(toyId) {
-    if (!confirm('?Eliminar este juguete?')) return;
+    if (!confirm('¿Eliminar este juguete?')) return;
     try {
         const response = await fetch(`/admin/delete_toy/${toyId}`, {
             method: 'POST',
-            headers: {
-                'X-CSRFToken': getCsrfToken(),
-                'X-Requested-With': 'XMLHttpRequest'
-            }
+            headers: { 'X-CSRFToken': getCsrfToken(), 'X-Requested-With': 'XMLHttpRequest' }
         });
         const data = await response.json();
         if (data.success) {
             const card = document.getElementById(`toy-${toyId}`);
             if (card) card.remove();
-        } else {
-            alert(data.message || 'Error al eliminar el juguete');
-        }
-    } catch (error) {
-        console.error('Error:', error);
-        alert('Error al eliminar el juguete');
-    }
+        } else { alert(data.message || 'Error al eliminar el juguete'); }
+    } catch (error) { console.error('Error:', error); alert('Error al eliminar el juguete'); }
 }
 
-// --------- Editar Centros (Disponibilidad) ---------
 function openCentersModal(toyId, toyName) {
     document.getElementById('centersToyId').value = toyId;
     document.getElementById('centersToyName').textContent = `Juguete: ${toyName}`;
-
-    // Desmarcar todo
     document.querySelectorAll('#editCentersForm input[name="centers"]').forEach(cb => cb.checked = false);
-
-    // Cargar centros actuales
-    fetch(`/admin/toys/${toyId}/centers`, {
-        method: 'GET',
-        headers: { 'X-Requested-With': 'XMLHttpRequest' }
-    })
+    fetch(`/admin/toys/${toyId}/centers`, { method: 'GET', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
     .then(r => r.json())
     .then(data => {
         if (data.success && Array.isArray(data.centers)) {
             const set = new Set(data.centers.map(c => (c || '').toLowerCase()));
             const boxes = document.querySelectorAll('#editCentersForm input[name="centers"]');
-            if (set.size === 0) {
-                // Interpretar como "todos los centros": marcar todos
-                boxes.forEach(cb => cb.checked = true);
-            } else {
-                boxes.forEach(cb => { cb.checked = set.has(cb.value.toLowerCase()); });
-            }
+            if (set.size === 0) { boxes.forEach(cb => cb.checked = true); }
+            else { boxes.forEach(cb => { cb.checked = set.has(cb.value.toLowerCase()); }); }
         }
         document.getElementById('editCentersModal').style.display = 'flex';
     })
-    .catch(() => {
-        document.getElementById('editCentersModal').style.display = 'flex';
-    });
+    .catch(() => { document.getElementById('editCentersModal').style.display = 'flex'; });
 }
 
 function saveCenters() {
@@ -561,23 +386,15 @@ function saveCenters() {
     const selected = Array.from(document.querySelectorAll('#editCentersForm input[name="centers"]:checked')).map(cb => cb.value);
     fetch(`/admin/toys/${toyId}/centers`, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCsrfToken()
-        },
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
         body: JSON.stringify({ centers: selected })
     })
     .then(r => r.json())
     .then(data => {
-        if (data.success) {
-            alert('Centros actualizados');
-            closeModal('editCentersModal');
-        } else {
-            alert(data.message || 'Error al actualizar centros');
-        }
+        if (data.success) { alert('Centros actualizados'); closeModal('editCentersModal'); }
+        else { alert(data.message || 'Error al actualizar centros'); }
     })
     .catch(() => alert('Error de conexión'));
 }
 </script>
 {% endblock %}
-
