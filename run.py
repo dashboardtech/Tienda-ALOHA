@@ -11,10 +11,20 @@ import sys
 import io
 from pathlib import Path
 
-# Fix Windows console encoding (cp1252 can't handle Unicode/emojis)
-if sys.stdout.encoding and sys.stdout.encoding.lower() != 'utf-8':
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+# Fix Windows headless/encoding issues
+try:
+    if not sys.stdout or not hasattr(sys.stdout, 'buffer') or sys.stdout.buffer is None:
+        # Headless mode: redirect to log file
+        log_path = Path(__file__).parent / 'instance' / 'app.log'
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_file = open(log_path, 'a', encoding='utf-8')
+        sys.stdout = log_file
+        sys.stderr = log_file
+    elif sys.stdout.encoding and sys.stdout.encoding.lower() != 'utf-8':
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+except Exception:
+    pass
 
 # Agregar el directorio actual al path para importaciones antes de importar "app"
 sys.path.insert(0, str(Path(__file__).parent))
