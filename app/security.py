@@ -4,7 +4,7 @@ from flask import abort, request, current_app, session
 from flask_login import current_user
 import bleach
 from werkzeug.security import generate_password_hash
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 import pyotp
 
@@ -61,7 +61,7 @@ def allowed_file(filename):
 
 def validate_age(birth_date):
     """Valida la edad del usuario"""
-    today = datetime.now().date()
+    today = datetime.now(timezone.utc).date()
     age = today.year - birth_date.year - ((today.month, today.day) < (birth_date.month, birth_date.day))
     if age < current_app.config['MIN_AGE']:
         return False, 'User too young'
@@ -86,7 +86,7 @@ def verify_2fa(token, secret):
 def check_rate_limit(user_id, action_type):
     """Verifica límites de tasa para diferentes acciones"""
     key = f'{action_type}:{user_id}'
-    current_time = datetime.now()
+    current_time = datetime.now(timezone.utc)
     attempts = session.get(key, [])
     attempts = [ts for ts in attempts if current_time - ts < timedelta(minutes=1)]
     if len(attempts) >= 5:
@@ -110,13 +110,13 @@ def log_security_event(event_type, description):
         'description': description,
         'user_id': current_user.id if current_user.is_authenticated else None,
         'ip_address': request.remote_addr,
-        'timestamp': datetime.now().isoformat()
+        'timestamp': datetime.now(timezone.utc).isoformat()
     })
 
 def validate_session():
     """Valida que la sesión esté activa y no haya expirado"""
     if 'last_activity' not in session:
-        session['last_activity'] = datetime.now()
+        session['last_activity'] = datetime.now(timezone.utc)
         return True
         
     last_activity = session['last_activity']
@@ -124,7 +124,7 @@ def validate_session():
         last_activity = datetime.fromisoformat(last_activity)
     
     # Permitir 30 minutos de inactividad
-    if datetime.now() - last_activity > timedelta(minutes=30):
+    if datetime.now(timezone.utc) - last_activity > timedelta(minutes=30):
         return False
     
     return True

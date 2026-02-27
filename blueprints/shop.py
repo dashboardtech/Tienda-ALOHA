@@ -7,7 +7,7 @@ from decimal import Decimal
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify, make_response, current_app
 from flask_login import login_required, current_user
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 import io
 from reportlab.lib import colors
@@ -589,7 +589,7 @@ def checkout():
                 discounted_total=discounted_total,
                 discount_center=center_record.slug if center_record else None,
                 total_price=discounted_total,
-                order_date=datetime.now(),
+                order_date=datetime.now(timezone.utc),
                 status='completada'
             )
             db.session.add(order)
