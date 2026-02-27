@@ -19,21 +19,21 @@ def setup_logging(app):
         fh.setFormatter(logging.Formatter(app.config.get('LOG_FORMAT')))
         logger.addHandler(fh)
 
-def validate_password(password):
+def validate_password_strength(password):
     """Valida que la contraseña cumpla con los requisitos mínimos"""
     min_length = 8  # Valor por defecto
     if current_app:
         min_length = current_app.config.get('PASSWORD_MIN_LENGTH', 8)
-    
+
     if len(password) < min_length:
-        return False, 'Password too short'
+        return False, 'Password must be at least %d characters long' % min_length
     if not any(c.isupper() for c in password):
-        return False, 'Password must contain uppercase letters'
+        return False, 'Password must contain at least one uppercase letter'
     if not any(c.islower() for c in password):
-        return False, 'Password must contain lowercase letters'
+        return False, 'Password must contain at least one lowercase letter'
     if not any(c.isdigit() for c in password):
-        return False, 'Password must contain numbers'
-    return True, 'Password valid'
+        return False, 'Password must contain at least one number'
+    return True, 'Password is strong'
 
 def sanitize_input(text):
     """Sanitiza input de usuario para prevenir XSS"""
@@ -58,16 +58,6 @@ def allowed_file(filename):
     """Valida que el tipo de archivo sea permitido"""
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in current_app.config['ALLOWED_EXTENSIONS']
-
-def validate_age(birth_date):
-    """Valida la edad del usuario"""
-    today = datetime.now(timezone.utc).date()
-    age = today.year - birth_date.year - ((today.month, today.day) < (birth_date.month, birth_date.day))
-    if age < current_app.config['MIN_AGE']:
-        return False, 'User too young'
-    if age > current_app.config['MAX_AGE']:
-        return False, 'User too old'
-    return True, 'Age valid'
 
 def secure_headers():
     """Retorna headers de seguridad para las respuestas"""
@@ -94,14 +84,6 @@ def check_rate_limit(user_id, action_type):
     attempts.append(current_time)
     session[key] = attempts
     return True
-
-def validate_transaction(user, amount):
-    """Valida una transacción basada en límites y patrones"""
-    if amount > current_app.config['MAX_SINGLE_TRANSACTION_AMOUNT']:
-        return False, 'Amount exceeds single transaction limit'
-    if not user.check_transaction_limits(amount):
-        return False, 'Daily transaction limit reached'
-    return True, 'Transaction valid'
 
 def log_security_event(event_type, description):
     """Registra eventos de seguridad"""
