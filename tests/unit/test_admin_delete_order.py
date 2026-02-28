@@ -87,7 +87,7 @@ def test_delete_order_restores_stock_and_balance(client, app):
 
         assert toy.stock == 5
         assert pytest.approx(buyer.balance, rel=1e-6) == 30.0
-        assert order.status == 'cancelled'
+        assert order.status == 'cancelada'
         assert order.is_active is False
         assert order.deleted_at is not None
         assert item.is_active is False
@@ -110,5 +110,5 @@ def test_delete_order_twice_returns_error(client, app):
 
         assert pytest.approx(buyer.balance, rel=1e-6) == 30.0
         assert toy.stock == 5
-        assert order.status == 'cancelled'
+        assert order.status == 'cancelada'
 
