@@ -9,7 +9,7 @@ from werkzeug.utils import secure_filename
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, jsonify, abort, Response, session
 from flask_login import login_required, current_user, login_user, logout_user
 from datetime import datetime, timedelta, timezone
-from sqlalchemy import desc, or_
+from sqlalchemy import case, desc, or_
 from sqlalchemy.orm import selectinload
 from decimal import Decimal, InvalidOperation
 
@@ -84,10 +84,15 @@ def dashboard():
     if sales_stats.get('error'):
         flash('Error al cargar estadísticas', 'error')
 
-    # Resumen de usuarios
-    total_users = User.query.count()
-    admins_count = User.query.filter_by(is_admin=True).count()
-    inactive_count = User.query.filter_by(is_active=False).count()
+    # Resumen de usuarios — single aggregation query instead of 3 separate counts
+    user_stats = db.session.query(
+        db.func.count(User.id).label('total'),
+        db.func.sum(case((User.is_admin == True, 1), else_=0)).label('admins'),
+        db.func.sum(case((User.is_active == False, 1), else_=0)).label('inactive')
+    ).first()
+    total_users = user_stats.total or 0
+    admins_count = int(user_stats.admins or 0)
+    inactive_count = int(user_stats.inactive or 0)
 
     # Sistema de inventario inteligente
     inventory_data = {}
@@ -713,15 +718,24 @@ def add_toy():
             if toy_form.image.data:
                 image_file = toy_form.image.data
                 if image_file.filename != '':
+                    # Validate actual image content via magic bytes
+                    import imghdr
+                    image_file.seek(0)
+                    detected = imghdr.what(image_file)
+                    image_file.seek(0)
+                    if detected not in ('jpeg', 'png', 'gif'):
+                        flash('El archivo no es una imagen válida (solo JPEG, PNG, GIF)', 'error')
+                        return redirect(url_for('admin.toys_page'))
+
                     # Crear directorio de imágenes si no existe
                     upload_folder = os.path.join(current_app.static_folder, 'images', 'toys')
                     os.makedirs(upload_folder, exist_ok=True)
-                    
+
                     # Generar nombre único para la imagen
                     filename = secure_filename(image_file.filename)
                     timestamp = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S_')
                     image_filename = timestamp + filename
-                    
+
                     # Guardar la imagen
                     image_path = os.path.join(upload_folder, image_filename)
                     image_file.save(image_path)
@@ -1044,14 +1058,17 @@ def toys_page():
     """Página independiente para gestionar juguetes"""
 
     toy_form = ToyForm()
-    toys = (
+    page = request.args.get('page', 1, type=int)
+    per_page = 50
+    toys_pagination = (
         Toy.query.options(selectinload(Toy.centers))
         .filter_by(is_active=True)
         .order_by(Toy.created_at.desc())
-        .all()
+        .paginate(page=page, per_page=per_page, error_out=False)
     )
 
-    return render_template('admin/inventory.html', toy_form=toy_form, toys=toys)
+    return render_template('admin/inventory.html', toy_form=toy_form,
+                           toys=toys_pagination.items, pagination=toys_pagination)
 
 # Administrar centros por juguete (obtener/actualizar)
 @admin_bp.route('/toys/<int:toy_id>/centers', methods=['GET', 'POST'])
@@ -1298,7 +1315,7 @@ def delete_order(order_id):
         user_balance = Decimal(str(order.user.balance or 0))
         order.user.balance = user_balance + refund_amount
 
-        order.status = 'cancelled'
+        order.status = 'cancelada'
         order.is_active = False
         order.deleted_at = datetime.now(timezone.utc)
         order.updated_at = datetime.now(timezone.utc)
@@ -1681,15 +1698,20 @@ def adjust_balance(user_id):
     if new_balance < 0:
         return jsonify({'error': 'El saldo no puede quedar negativo'}), 400
 
+    old_balance = user.balance
     user.balance = new_balance
 
-    # TODO: registrar en BalanceLog si se implementa
     try:
         db.session.commit()
+        current_app.logger.info(
+            f'Balance adjusted: admin={current_user.username} user={user.username} '
+            f'old={old_balance} new={new_balance} delta={amount} reason="{reason}"'
+        )
         return jsonify({'message': 'Saldo actualizado', 'new_balance': user.balance})
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+        current_app.logger.error(f'Balance adjustment failed: {e}')
+        return jsonify({'error': 'Error al actualizar saldo'}), 500
 
 
 # ===============================

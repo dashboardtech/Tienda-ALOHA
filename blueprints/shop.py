@@ -21,6 +21,7 @@ from reportlab.lib.enums import TA_CENTER, TA_LEFT
 # Importaciones absolutas
 from app.models import Toy, Order, OrderItem, User, Center, ToyCenterAvailability
 from app.extensions import db
+from sqlalchemy.orm import selectinload
 from app.filters import format_currency
 from pagination_helpers import PaginationHelper, paginate_query
 from app.utils import collect_center_choices, normalize_center_slug
@@ -586,6 +587,7 @@ def checkout():
         discount_amount = Decimal('0.00')
         discounted_total = subtotal
         center_record = None
+        flash('No se pudo aplicar tu descuento de centro. Verifica con un administrador.', 'warning')
 
     if request.method == 'POST':
         try:
@@ -957,8 +959,10 @@ def download_receipt(order_id):
         current_app.logger.debug(f"=== Inicio de generacion de PDF para orden {order_id} ===")
         current_app.logger.debug(f"Usuario actual: {current_user.id} (Admin: {current_user.is_admin})")
 
-        # Obtener la orden
-        order = Order.query.get_or_404(order_id)
+        # Obtener la orden con eager loading para evitar N+1 en PDF
+        order = Order.query.options(
+            selectinload(Order.items).selectinload(OrderItem.toy)
+        ).get_or_404(order_id)
         current_app.logger.debug(f"Orden encontrada: ID={order.id}, Usuario={order.user_id}, Total={order.total_price}")
 
         # Verificar permisos
