@@ -8,23 +8,7 @@ Versión: 2.0
 """
 import os
 import sys
-import io
 from pathlib import Path
-
-# Fix Windows headless/encoding issues
-try:
-    if not sys.stdout or not hasattr(sys.stdout, 'buffer') or sys.stdout.buffer is None:
-        # Headless mode: redirect to log file
-        log_path = Path(__file__).parent / 'instance' / 'app.log'
-        log_path.parent.mkdir(parents=True, exist_ok=True)
-        log_file = open(log_path, 'a', encoding='utf-8')
-        sys.stdout = log_file
-        sys.stderr = log_file
-    elif sys.stdout.encoding and sys.stdout.encoding.lower() != 'utf-8':
-        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
-except Exception:
-    pass
 
 # Agregar el directorio actual al path para importaciones antes de importar "app"
 sys.path.insert(0, str(Path(__file__).parent))
@@ -32,8 +16,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 from app import create_app
 
 # Configuración de host y puerto con valores por defecto
-APP_HOST = os.getenv("APP_HOST", "192.168.0.51")
-APP_PORT = int(os.getenv("APP_PORT", 5070))
+APP_HOST = os.getenv("APP_HOST", "0.0.0.0")
+APP_PORT = int(os.getenv("APP_PORT", 5000))
 
 def setup_environment():
     """Configurar variables de entorno y directorios necesarios"""
@@ -98,11 +82,12 @@ def main():
         print("\n💡 Press Ctrl+C to stop the server\n")
 
         # Ejecutar la aplicación
+        is_dev = os.getenv("FLASK_ENV") != "production"
         app.run(
             host=APP_HOST,
             port=APP_PORT,
-            debug=False,
-            use_reloader=True,
+            debug=is_dev,
+            use_reloader=is_dev,
             threaded=True
         )
         

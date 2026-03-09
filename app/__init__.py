@@ -96,8 +96,7 @@ def create_app(config_class=None):
     # Seguridad de cookies
     app.config.setdefault('SESSION_COOKIE_HTTPONLY', True)
     app.config.setdefault('SESSION_COOKIE_SAMESITE', 'Lax')
-    if app.config.get('ENV') == 'production':
-        app.config['SESSION_COOKIE_SECURE'] = True
+    # SESSION_COOKIE_SECURE is set by the config class (respects env var)
 
     # Logging de seguridad (como en app/app.py)
     logging.basicConfig(
