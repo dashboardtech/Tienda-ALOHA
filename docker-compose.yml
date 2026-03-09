@@ -10,9 +10,6 @@ services:
       - ./static/images:/app/static/images
     env_file:
       - .env
-    environment:
-      - APP_HOST=0.0.0.0
-      - APP_PORT=5000
     command: ["python", "run.py"]
 
 volumes:

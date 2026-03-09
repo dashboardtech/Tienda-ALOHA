@@ -35,11 +35,6 @@ from app import create_app
 APP_HOST = os.getenv("APP_HOST", "192.168.0.51")
 APP_PORT = int(os.getenv("APP_PORT", 5070))
 
-def initialize_advanced_systems(app):
-    """Inicializar sistemas avanzados de la aplicación"""
-    print("🔧 Initializing systems...")
-    print("✅ Application ready")
-
 def setup_environment():
     """Configurar variables de entorno y directorios necesarios"""
     # Variables de entorno por defecto
@@ -96,9 +91,6 @@ def main():
         # Crear la aplicación Flask
         print("🏗️ Creating Flask application...")
         app = create_app()
-        
-        # Inicializar sistemas avanzados
-        initialize_advanced_systems(app)
         
         print("\n🚀 Starting Flask development server...")
         print(f"📱 Access the application at: http://{APP_HOST}:{APP_PORT}")

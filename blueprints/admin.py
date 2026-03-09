@@ -27,20 +27,12 @@ backup_manager = None
 BACKUP_SYSTEM_AVAILABLE = False
 ADVANCED_SYSTEMS_AVAILABLE = False
 
-def moderate_rate_limit(message=None):
+def _noop_rate_limit(message=None):
+    """No-op rate limiter (subsystem not implemented)."""
     def decorator(f):
         return f
     return decorator
-def strict_rate_limit(message=None):
-    def decorator(f):
-        return f
-    return decorator
-def relaxed_rate_limit(message=None):
-    def decorator(f):
-        return f
-    return decorator
-
-# ✅ Sistema de backup simplificado ya importado arriba
+moderate_rate_limit = strict_rate_limit = relaxed_rate_limit = _noop_rate_limit
 
 # Crear el blueprint de administración
 admin_bp = Blueprint('admin', __name__)

@@ -1,6 +1,10 @@
 import os
 from datetime import timedelta
 
+def _env_bool(name, default="true"):
+    """Read a boolean from an environment variable ('true'/'false' string)."""
+    return os.environ.get(name, default).lower() != "false"
+
 def _get_persistent_key(env_var, filename):
     """Get a secret key from env, file, or generate and persist one."""
     key = os.environ.get(env_var)
@@ -26,7 +30,7 @@ class Config:
     
     # Session Security
     PERMANENT_SESSION_LIFETIME = timedelta(days=7)
-    SESSION_COOKIE_SECURE = os.environ.get("SESSION_COOKIE_SECURE", "true").lower() != "false"
+    SESSION_COOKIE_SECURE = _env_bool("SESSION_COOKIE_SECURE")
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
     
@@ -92,7 +96,7 @@ class ProductionConfig(Config):
     TESTING = False
     
     # Enhanced security for production
-    SESSION_COOKIE_SECURE = os.environ.get("SESSION_COOKIE_SECURE", "true").lower() != "false"
-    REMEMBER_COOKIE_SECURE = os.environ.get("SESSION_COOKIE_SECURE", "true").lower() != "false"
+    SESSION_COOKIE_SECURE = _env_bool("SESSION_COOKIE_SECURE")
+    REMEMBER_COOKIE_SECURE = _env_bool("SESSION_COOKIE_SECURE")
     SESSION_COOKIE_HTTPONLY = True
     PREFERRED_URL_SCHEME = 'https'
