@@ -22,41 +22,23 @@ from utils import normalize_email
 from app.utils.centers import collect_center_choices, normalize_center_slug
 from app import cache
 
-# 💾 Importar Sistema de Backup Simplificado
-try:
-    from utils.backup_system_simple import backup_manager
-    BACKUP_SYSTEM_AVAILABLE = True
-except ImportError:
-    backup_manager = None
-    BACKUP_SYSTEM_AVAILABLE = False
+# These subsystems are not yet implemented; set fallback values directly.
+backup_manager = None
+BACKUP_SYSTEM_AVAILABLE = False
+ADVANCED_SYSTEMS_AVAILABLE = False
 
-# Importar sistemas avanzados
-try:
-    from inventory_system import InventoryManager
-    from cache_system import DashboardCache
-    ADVANCED_SYSTEMS_AVAILABLE = True
-except ImportError:
-    ADVANCED_SYSTEMS_AVAILABLE = False
-
-# 🔐 Importar Rate Limiter
-try:
-    from utils.rate_limiter import moderate_rate_limit, strict_rate_limit, relaxed_rate_limit
-    RATE_LIMITING_AVAILABLE = True
-except ImportError:
-    # Fallback si no está disponible
-    def moderate_rate_limit(message=None):
-        def decorator(f):
-            return f
-        return decorator
-    def strict_rate_limit(message=None):
-        def decorator(f):
-            return f
-        return decorator
-    def relaxed_rate_limit(message=None):
-        def decorator(f):
-            return f
-        return decorator
-    RATE_LIMITING_AVAILABLE = False
+def moderate_rate_limit(message=None):
+    def decorator(f):
+        return f
+    return decorator
+def strict_rate_limit(message=None):
+    def decorator(f):
+        return f
+    return decorator
+def relaxed_rate_limit(message=None):
+    def decorator(f):
+        return f
+    return decorator
 
 # ✅ Sistema de backup simplificado ya importado arriba
 

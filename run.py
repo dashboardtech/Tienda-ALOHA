@@ -37,34 +37,8 @@ APP_PORT = int(os.getenv("APP_PORT", 5070))
 
 def initialize_advanced_systems(app):
     """Inicializar sistemas avanzados de la aplicación"""
-    print("🔧 Initializing advanced systems...")
-    
-    # 1. Sistema de Logging
-    try:
-        from utils.logging_system import init_logging_system
-        logger = init_logging_system(app)
-        logger.log_info("🚀 Tiendita ALOHA starting up", category='main')
-        print("✅ Logging system initialized")
-    except Exception as e:
-        print(f"⚠️ Logging system initialization failed: {e}")
-    
-    # 2. Sistema de Performance/Cache
-    try:
-        from utils.performance_optimizer import init_performance_optimizer
-        optimizer = init_performance_optimizer(app)
-        print("✅ Performance optimizer initialized")
-    except Exception as e:
-        print(f"⚠️ Performance optimizer initialization failed: {e}")
-    
-    # 3. Sistema de Backup
-    try:
-        from utils.backup_system_simple import init_backup_system
-        init_backup_system(app)
-        print("✅ Backup system initialized")
-    except Exception as e:
-        print(f"⚠️ Backup system initialization failed: {e}")
-    
-    print("🎉 All advanced systems initialized successfully!")
+    print("🔧 Initializing systems...")
+    print("✅ Application ready")
 
 def setup_environment():
     """Configurar variables de entorno y directorios necesarios"""
@@ -126,22 +100,6 @@ def main():
         # Inicializar sistemas avanzados
         initialize_advanced_systems(app)
         
-        # Log de inicio exitoso
-        try:
-            from utils.logging_system import tiendita_logger
-            tiendita_logger.log_info(
-                "🎉 Tiendita ALOHA started successfully",
-                category='main',
-                extra_data={
-                    'host': APP_HOST,
-                    'port': APP_PORT,
-                    'debug': True,
-                    'version': '2.0'
-                }
-            )
-        except:
-            pass
-
         print("\n🚀 Starting Flask development server...")
         print(f"📱 Access the application at: http://{APP_HOST}:{APP_PORT}")
         print(f"🔧 Admin panel at: http://{APP_HOST}:{APP_PORT}/admin")
@@ -158,19 +116,9 @@ def main():
         
     except KeyboardInterrupt:
         print("\n🛑 Server stopped by user")
-        try:
-            from utils.logging_system import tiendita_logger
-            tiendita_logger.log_info("🛑 Tiendita ALOHA stopped by user", category='main')
-        except:
-            pass
-    
+
     except Exception as e:
         print(f"\n❌ Error starting application: {e}")
-        try:
-            from utils.logging_system import tiendita_logger
-            tiendita_logger.log_error(f"❌ Application startup error: {e}", exception=e)
-        except:
-            pass
         sys.exit(1)
 
 if __name__ == "__main__":
