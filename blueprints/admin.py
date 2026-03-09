@@ -589,7 +589,7 @@ def all_users():
         users_pagination, 'admin.all_users', search=search_term, status=status_filter
     )
     
-    today_start_dt = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    today_start_dt = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
 
     return render_template('admin_users.html',
                            users=users_pagination,

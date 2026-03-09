@@ -26,7 +26,7 @@ class Config:
     
     # Session Security
     PERMANENT_SESSION_LIFETIME = timedelta(days=7)
-    SESSION_COOKIE_SECURE = True
+    SESSION_COOKIE_SECURE = os.environ.get("SESSION_COOKIE_SECURE", "true").lower() != "false"
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
     
@@ -85,14 +85,14 @@ class DevelopmentConfig(Config):
 
     # Ensure development uses the correct database file
     basedir = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
-    SQLALCHEMY_DATABASE_URI = 'sqlite:///' + os.path.join(basedir, 'instance', 'tiendita-dev.db')
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///' + os.path.join(basedir, 'instance', 'tiendita-dev.db')
 
 class ProductionConfig(Config):
     DEBUG = False
     TESTING = False
     
     # Enhanced security for production
-    SESSION_COOKIE_SECURE = True
-    REMEMBER_COOKIE_SECURE = True
+    SESSION_COOKIE_SECURE = os.environ.get("SESSION_COOKIE_SECURE", "true").lower() != "false"
+    REMEMBER_COOKIE_SECURE = os.environ.get("SESSION_COOKIE_SECURE", "true").lower() != "false"
     SESSION_COOKIE_HTTPONLY = True
     PREFERRED_URL_SCHEME = 'https'
