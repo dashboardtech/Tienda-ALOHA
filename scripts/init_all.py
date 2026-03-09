@@ -8,6 +8,10 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from app import create_app, db
 from app.models import User, Toy
 
+ADMIN_DEFAULT_PASSWORD = os.environ.get('ADMIN_DEFAULT_PASSWORD')
+if not ADMIN_DEFAULT_PASSWORD:
+    raise RuntimeError("ADMIN_DEFAULT_PASSWORD environment variable must be set")
+
 # Crear la aplicación
 app = create_app()
 
@@ -39,12 +43,12 @@ def init_all():
             center='David',
             is_active=True
         )
-        admin.set_password('admin123')  # Establecer la contraseña
+        admin.set_password(ADMIN_DEFAULT_PASSWORD)
         db.session.add(admin)
         db.session.commit()
         print("\n👤 Usuario admin creado:")
         print("Username: admin")
-        print("Password: admin123")
+        print("Password: (set via ADMIN_DEFAULT_PASSWORD env var)")
         
         # Crear juguetes
         toys = [
@@ -84,7 +88,7 @@ def init_all():
         print(f"Juguetes: {Toy.query.count()}")
         
         admin = User.query.filter_by(username='admin').first()
-        if admin and admin.check_password('admin123'):
+        if admin and admin.check_password(ADMIN_DEFAULT_PASSWORD):
             print("✅ Admin verificado correctamente")
         else:
             print("❌ Error en la verificación del admin")

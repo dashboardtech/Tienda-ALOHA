@@ -6,6 +6,7 @@
 <div class="admin-login-container">
     <h2>Inicio de Sesion de Administrador</h2>
     <form method="POST" action="{{ url_for('main.admin_login') }}" class="admin-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="form-group">
             <label for="username">Usuario:</label>
             <input type="text" id="username" name="username" required>

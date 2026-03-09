@@ -5,6 +5,10 @@ import os
 from app import create_app, db
 from app.models import User, Toy
 
+ADMIN_DEFAULT_PASSWORD = os.environ.get('ADMIN_DEFAULT_PASSWORD')
+if not ADMIN_DEFAULT_PASSWORD:
+    raise RuntimeError("ADMIN_DEFAULT_PASSWORD environment variable must be set")
+
 def init_db():
     """Inicializa la base de datos."""
     app = create_app()
@@ -36,7 +40,7 @@ def init_db():
             center='David',
             is_active=True
         )
-        admin.set_password('admin123')
+        admin.set_password(ADMIN_DEFAULT_PASSWORD)
         db.session.add(admin)
         
         # Crear un juguete de ejemplo

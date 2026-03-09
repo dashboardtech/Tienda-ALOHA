@@ -105,7 +105,7 @@ def insert_test_data():
         admin_data = {
             'username': 'admin',
             'email': 'admin@aloha.com',
-            'password_hash': 'pbkdf2:sha256:260000$GDBCIzk11sUAoe9M$d2791040e6665a924fab04f9a5a96a42c1a52dfe002c41a93a1817d2608ae8db',  # admin123
+            'password_hash': 'pbkdf2:sha256:260000$GDBCIzk11sUAoe9M$d2791040e6665a924fab04f9a5a96a42c1a52dfe002c41a93a1817d2608ae8db',  # set-via-env-var
             'is_admin': True,
             'balance': 1000.0,
             'center': 'David',

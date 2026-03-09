@@ -3,6 +3,10 @@ import sys
 from app import app, db
 from models import User, Toy
 
+ADMIN_DEFAULT_PASSWORD = os.environ.get('ADMIN_DEFAULT_PASSWORD')
+if not ADMIN_DEFAULT_PASSWORD:
+    raise RuntimeError("ADMIN_DEFAULT_PASSWORD environment variable must be set")
+
 def setup_app():
     """Initialize the application"""
     with app.app_context():
@@ -14,7 +18,7 @@ def setup_app():
         if not admin:
             print("Creating admin user...")
             admin = User(username='admin', is_admin=True)
-            admin.set_password('admin123')
+            admin.set_password(ADMIN_DEFAULT_PASSWORD)
             db.session.add(admin)
             
             # Create some sample toys

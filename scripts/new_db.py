@@ -4,6 +4,10 @@ from datetime import datetime
 import os
 import shutil
 
+ADMIN_DEFAULT_PASSWORD = os.environ.get('ADMIN_DEFAULT_PASSWORD')
+if not ADMIN_DEFAULT_PASSWORD:
+    raise RuntimeError("ADMIN_DEFAULT_PASSWORD environment variable must be set")
+
 def create_new_db():
     with app.app_context():
         print("\n🔄 Creando nueva base de datos...")
@@ -39,7 +43,7 @@ def create_new_db():
             created_at=datetime.now(),
             last_login=datetime.now()
         )
-        admin.set_password('admin123')
+        admin.set_password(ADMIN_DEFAULT_PASSWORD)
         db.session.add(admin)
         
         try:
@@ -119,6 +123,6 @@ if __name__ == '__main__':
         print("\n🚀 Todo listo. Ahora puedes iniciar el servidor Flask")
         print("\n👤 Credenciales de admin:")
         print("Username: admin")
-        print("Password: admin123")
+        print("Password: (set via ADMIN_DEFAULT_PASSWORD env var)")
     else:
         print("\n❌ Hubo errores durante la creación")

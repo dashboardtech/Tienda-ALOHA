@@ -6,6 +6,7 @@
 <div class="child-friendly-form">
     <h2 class="form-title">Send ALOHA Dollars</h2>
     <form method="POST" action="{{ url_for('transfer_balance') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="form-group">
             <label for="recipient">Who do you want to send ALOHA dollars to?</label>
             <input type="text" id="recipient" name="recipient" required>

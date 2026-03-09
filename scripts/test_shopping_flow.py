@@ -1,8 +1,13 @@
+import os
 from app import create_app, db
 from app.models import Toy
 
+ADMIN_DEFAULT_PASSWORD = os.environ.get('ADMIN_DEFAULT_PASSWORD')
+if not ADMIN_DEFAULT_PASSWORD:
+    raise RuntimeError("ADMIN_DEFAULT_PASSWORD environment variable must be set")
+
 USERNAME = "admin"
-PASSWORD = "admin123"
+PASSWORD = ADMIN_DEFAULT_PASSWORD
 
 def login(client, username, password):
     return client.post("/auth/login", data={

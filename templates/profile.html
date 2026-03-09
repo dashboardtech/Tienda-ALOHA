@@ -97,6 +97,7 @@
     <div class="modal-content">
         <h2>🔑 Cambiar Contrasena</h2>
         <form id="changePasswordForm" action="{{ url_for('user.change_password') }}" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="form-group">
                 <label for="currentPassword">Contrasena Actual:</label>
                 <input type="password" id="currentPassword" name="current_password" required>

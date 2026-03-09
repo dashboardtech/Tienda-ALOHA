@@ -7,6 +7,10 @@ import os
 from app import create_app, db
 from app.models import User, Toy, Order, OrderItem
 
+ADMIN_DEFAULT_PASSWORD = os.environ.get('ADMIN_DEFAULT_PASSWORD')
+if not ADMIN_DEFAULT_PASSWORD:
+    raise RuntimeError("ADMIN_DEFAULT_PASSWORD environment variable must be set")
+
 def reset_database():
     """Elimina la base de datos existente y crea una nueva con las tablas necesarias."""
     app = create_app()
@@ -31,7 +35,7 @@ def reset_database():
             center='David',
             is_active=True
         )
-        admin.set_password('admin123')
+        admin.set_password(ADMIN_DEFAULT_PASSWORD)
         db.session.add(admin)
         
         # Crear algunos juguetes de ejemplo
@@ -71,7 +75,7 @@ def reset_database():
         print("✅ Base de datos reiniciada exitosamente.")
         print(f"👤 Usuario administrador creado:")
         print(f"   Username: admin")
-        print(f"   Password: admin123")
+        print(f"   Password: (set via ADMIN_DEFAULT_PASSWORD env var)")
         print(f"📦 {len(toys)} juguetes de ejemplo creados.")
 
 if __name__ == "__main__":

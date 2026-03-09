@@ -5,9 +5,14 @@ Script de Diagnóstico Detallado para Problemas de Checkout
 Este script diagnostica paso a paso el proceso de checkout
 """
 
+import os
 import requests
 from bs4 import BeautifulSoup
 import json
+
+ADMIN_DEFAULT_PASSWORD = os.environ.get('ADMIN_DEFAULT_PASSWORD')
+if not ADMIN_DEFAULT_PASSWORD:
+    raise RuntimeError("ADMIN_DEFAULT_PASSWORD environment variable must be set")
 
 BASE_URL = "http://127.0.0.1:5003"
 
@@ -31,7 +36,7 @@ def diagnose_checkout():
     
     login_data = {
         'username': 'admin',
-        'password': 'admin123',
+        'password': ADMIN_DEFAULT_PASSWORD,
         'csrf_token': csrf_value
     }
     

@@ -1760,14 +1760,21 @@ def create_backup():
 @admin_bp.route('/backup/download/<filename>')
 def download_backup(filename):
     """Descargar un archivo de backup (solo superuser)"""
-    
+
     if not BACKUP_SYSTEM_AVAILABLE:
         abort(404)
-    
+
+    safe_filename = os.path.basename(filename)
+    if not safe_filename or safe_filename != filename:
+        abort(400)
+
     try:
         backup_manager.init_app(current_app)
-        backup_path = backup_manager.backup_dir / filename
-        
+        backup_path = (backup_manager.backup_dir / safe_filename).resolve()
+
+        if not str(backup_path).startswith(str(backup_manager.backup_dir.resolve())):
+            abort(403)
+
         if not backup_path.exists() or not backup_path.name.startswith('tiendita_backup_'):
             abort(404)
         
@@ -1789,14 +1796,21 @@ def download_backup(filename):
 @moderate_rate_limit(message="⚠️ Demasiados intentos de eliminación de backup.")
 def delete_backup(filename):
     """Eliminar un archivo de backup (solo superuser)"""
-    
+
     if not BACKUP_SYSTEM_AVAILABLE:
         return jsonify({'error': 'Sistema de backup no disponible'}), 500
-    
+
+    safe_filename = os.path.basename(filename)
+    if not safe_filename or safe_filename != filename:
+        abort(400)
+
     try:
         backup_manager.init_app(current_app)
-        backup_path = backup_manager.backup_dir / filename
-        
+        backup_path = (backup_manager.backup_dir / safe_filename).resolve()
+
+        if not str(backup_path).startswith(str(backup_manager.backup_dir.resolve())):
+            abort(403)
+
         if not backup_path.exists() or not backup_path.name.startswith('tiendita_backup_'):
             return jsonify({'error': 'Backup no encontrado'}), 404
         

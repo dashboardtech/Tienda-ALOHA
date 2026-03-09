@@ -10,6 +10,7 @@
         </div>
         <div class="card-content">
             <form method="POST" action="{{ url_for('user.add_balance') }}" class="balance-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="form-group">
                     <label for="amount">Cantidad a Agregar:</label>
                     <div class="amount-input">
