@@ -21,6 +21,7 @@ from pagination_helpers import PaginationHelper, paginate_query
 from utils import normalize_email
 from app.utils.centers import collect_center_choices, normalize_center_slug
 from app import cache
+from app.balance import atomic_add_balance, atomic_adjust_balance, atomic_set_balance, atomic_refund_balance, is_duplicate_operation
 
 # These subsystems are not yet implemented; set fallback values directly.
 backup_manager = None
@@ -199,8 +200,8 @@ def centers_admin():
         action = request.form.get('action', '').strip()
         try:
             if action == 'create':
-                name = (request.form.get('name') or '').strip()
-                raw_slug = (request.form.get('slug') or '').strip()
+                name = (request.form.get('name') or '').strip()[:100]
+                raw_slug = (request.form.get('slug') or '').strip()[:100]
                 discount_input = (request.form.get('discount_percentage') or '0').strip()
 
                 if not raw_slug and name:
@@ -516,7 +517,7 @@ def all_users():
     page = PaginationHelper.get_page_number()
     per_page = PaginationHelper.get_per_page(default=15)
 
-    search_term = request.args.get('search', '')
+    search_term = (request.args.get('search', '') or '').strip().replace('%', '').replace('_', '')[:100]
     users_query = User.query
 
     if search_term:
@@ -645,21 +646,25 @@ def delete_user(user_id):
 def update_user_balance(user_id):
     """Actualizar saldo (ALOHA Dollars) de un usuario desde el panel admin."""
 
-    user = User.query.get_or_404(user_id)
+    User.query.get_or_404(user_id)
     try:
         if request.is_json:
             data = request.get_json() or {}
             amount = Decimal(str(data.get('balance')))
         else:
             amount = Decimal(str(request.form.get('balance')))
-        if amount < 0:
-            return jsonify({'success': False, 'message': 'El saldo no puede ser negativo'}), 400
-        user.balance = amount
+        if amount < 0 or amount > Decimal('99999.99'):
+            return jsonify({'success': False, 'message': 'El saldo debe estar entre 0 y 99999.99'}), 400
+        user = atomic_set_balance(user_id, amount)
         db.session.commit()
         return jsonify({'success': True, 'balance': user.balance})
+    except (InvalidOperation, TypeError, ValueError):
+        db.session.rollback()
+        return jsonify({'success': False, 'message': 'Cantidad inválida'}), 400
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 400
+        current_app.logger.error(f'Error updating balance for user {user_id}: {e}')
+        return jsonify({'success': False, 'message': 'Error al actualizar saldo'}), 400
 
 
 @admin_bp.route('/toys/add', methods=['POST'])
@@ -788,8 +793,8 @@ def bulk_upload_toys():
             csv_stream = StringIO(text)
             reader = list(csv.DictReader(csv_stream))
         except Exception as e:
-            flash(f'Error al procesar el CSV: {e}', 'error')
             current_app.logger.error(f'Error procesando CSV: {e}')
+            flash('Error al procesar el archivo CSV. Verifica el formato.', 'error')
             return redirect(url_for('admin.bulk_upload_toys'))
         current_app.logger.info(f'Iniciando carga masiva desde CSV: {len(reader)} filas')
 
@@ -1019,12 +1024,20 @@ def update_toy_stock(toy_id):
     try:
         data = request.get_json() or {}
         delta = int(data.get('delta', 0))
-        toy.stock = max(0, toy.stock + delta)
+        if abs(delta) > 10000:
+            return jsonify({'success': False, 'message': 'Ajuste de stock fuera de rango (máx 10000)'}), 400
+        new_stock = max(0, toy.stock + delta)
+        if new_stock > 99999:
+            return jsonify({'success': False, 'message': 'Stock no puede exceder 99999'}), 400
+        toy.stock = new_stock
         db.session.commit()
         return jsonify({'success': True, 'stock': toy.stock})
+    except (ValueError, TypeError):
+        return jsonify({'success': False, 'message': 'Valor de ajuste inválido'}), 400
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+        current_app.logger.error(f'Error updating stock for toy {toy_id}: {e}')
+        return jsonify({'success': False, 'message': 'Error al actualizar stock'}), 500
 
 # NUEVA RUTA: Gestión dedicada de juguetes
 @admin_bp.route('/toys')
@@ -1087,7 +1100,8 @@ def manage_toy_centers(toy_id):
         return jsonify({'success': True, 'centers': new_centers})
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+        current_app.logger.error(f'Error managing centers for toy {toy_id}: {e}')
+        return jsonify({'success': False, 'message': 'Error al actualizar centros'}), 500
 
 # NUEVA IMPLEMENTACIÓN: Edición de juguetes simple y robusta
 @admin_bp.route('/toy_edit_new/<int:toy_id>', methods=['POST'])
@@ -1122,11 +1136,28 @@ def toy_edit_new(toy_id):
             current_app.logger.info(f"Editando juguete {toy_id} - Datos recibidos: {request.form}")
             
             # Actualizar datos básicos
-            toy.name = request.form.get('name', toy.name)
-            toy.description = request.form.get('description', toy.description)
-            toy.price = Decimal(str(request.form.get('price', toy.price)))
+            name = (request.form.get('name') or '').strip()
+            if name:
+                if len(name) > 200:
+                    raise ValueError('Nombre demasiado largo')
+                toy.name = name
+            description = request.form.get('description', toy.description)
+            if description and len(description) > 2000:
+                raise ValueError('Descripción demasiado larga')
+            toy.description = description
+            price_raw = request.form.get('price')
+            if price_raw is not None:
+                price_val = Decimal(str(price_raw))
+                if price_val < 0 or price_val > Decimal('99999.99'):
+                    raise ValueError('Precio fuera de rango')
+                toy.price = price_val
             toy.category = request.form.get('category', toy.category)
-            toy.stock = int(request.form.get('stock', toy.stock))
+            stock_raw = request.form.get('stock')
+            if stock_raw is not None:
+                stock_val = int(stock_raw)
+                if stock_val < 0 or stock_val > 99999:
+                    raise ValueError('Stock fuera de rango')
+                toy.stock = stock_val
             toy.updated_at = datetime.now(timezone.utc)
             
             # Guardar cambios
@@ -1150,16 +1181,20 @@ def toy_edit_new(toy_id):
                 flash('Juguete actualizado exitosamente', 'success')
                 return redirect(url_for('admin.toys_page'))
                 
+        except (ValueError, InvalidOperation) as e:
+            db.session.rollback()
+            user_msg = str(e) if str(e) in ('Nombre demasiado largo', 'Descripción demasiado larga', 'Precio fuera de rango', 'Stock fuera de rango') else 'Datos inválidos'
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({'success': False, 'message': user_msg}), 400
+            else:
+                flash(user_msg, 'error')
+                return redirect(url_for('admin.toys_page'))
         except Exception as e:
             db.session.rollback()
-            error_msg = f"Error al actualizar juguete: {str(e)}"
-            current_app.logger.error(error_msg)
-            
+            current_app.logger.error(f"Error al actualizar juguete {toy_id}: {e}")
+            error_msg = 'Error al actualizar el juguete'
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return jsonify({
-                    'success': False,
-                    'message': error_msg
-                }), 500
+                return jsonify({'success': False, 'message': error_msg}), 500
             else:
                 flash(error_msg, 'error')
                 return redirect(url_for('admin.toys_page'))
@@ -1201,7 +1236,8 @@ def inventory_alerts():
             'timestamp': datetime.now(timezone.utc).isoformat()
         })
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        current_app.logger.error(f'Error fetching inventory alerts: {e}')
+        return jsonify({'error': 'Error al obtener alertas de inventario'}), 500
 
 @admin_bp.route('/orders')
 def all_orders():
@@ -1211,9 +1247,9 @@ def all_orders():
     per_page = 20
     
     # Obtener parámetros de búsqueda y filtrado
-    search_query = request.args.get('search', '').strip()
+    search_query = request.args.get('search', '').strip().replace('%', '').replace('_', '')[:100]
     status_filter = request.args.get('status', 'all')
-    
+
     # Construir consulta base with eager loading to avoid N+1 queries
     query = Order.query.options(
         selectinload(Order.items).selectinload(OrderItem.toy),
@@ -1286,8 +1322,8 @@ def delete_order(order_id):
 
             item.is_active = False
 
-        user_balance = Decimal(str(order.user.balance or 0))
-        order.user.balance = user_balance + refund_amount
+        if refund_amount > 0:
+            atomic_refund_balance(order.user.id, refund_amount)
 
         order.status = 'cancelada'
         order.is_active = False
@@ -1391,8 +1427,8 @@ def send_inventory_alerts():
             return jsonify({'error': 'Error al enviar las alertas'}), 500
             
     except Exception as e:
-        current_app.logger.error(f"Error en send_inventory_alerts: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        current_app.logger.error(f"Error en send_inventory_alerts: {e}")
+        return jsonify({'error': 'Error al enviar alertas de inventario'}), 500
 
 @admin_bp.route('/add_user', methods=['GET', 'POST'])
 def add_user():
@@ -1458,8 +1494,7 @@ def add_user():
             db.session.rollback()
             current_app.logger.exception("Error adding user %s", form.username.data)
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return jsonify({'success': False, 'message': str(e)}), 400
-            current_app.logger.error(f'Error adding user: {e}')
+                return jsonify({'success': False, 'message': 'Error al agregar usuario'}), 400
             flash('Error al agregar usuario.', 'danger')
             return redirect(url_for('admin.all_users'))
 
@@ -1659,29 +1694,35 @@ def export_inventory():
 @admin_bp.route('/adjust_balance/<int:user_id>', methods=['POST'])
 def adjust_balance(user_id):
 
-    user = User.query.get_or_404(user_id)
+    User.query.get_or_404(user_id)
 
     try:
         data = request.get_json()
         amount = Decimal(str(data.get('amount', '0')))
-        reason = data.get('reason', '')
+        reason = (data.get('reason', '') or '')[:500]
     except (InvalidOperation, TypeError):
         return jsonify({'error': 'Cantidad inválida'}), 400
 
-    new_balance = user.balance + amount
-    if new_balance < 0:
-        return jsonify({'error': 'El saldo no puede quedar negativo'}), 400
+    if abs(amount) > Decimal('9999.99'):
+        return jsonify({'error': 'Ajuste fuera de rango (máx 9999.99)'}), 400
 
-    old_balance = user.balance
-    user.balance = new_balance
+    if is_duplicate_operation(user_id, amount, 'adjust_balance'):
+        return jsonify({'error': 'Operación duplicada detectada. Espera unos segundos.'}), 409
 
     try:
+        old_user = User.query.get(user_id)
+        old_balance = old_user.balance
+        user = atomic_adjust_balance(user_id, amount)
         db.session.commit()
         current_app.logger.info(
             f'Balance adjusted: admin={current_user.username} user={user.username} '
-            f'old={old_balance} new={new_balance} delta={amount} reason="{reason}"'
+            f'old={old_balance} new={user.balance} delta={amount} reason="{reason}"'
         )
         return jsonify({'message': 'Saldo actualizado', 'new_balance': user.balance})
+    except ValueError as e:
+        db.session.rollback()
+        current_app.logger.warning(f'Balance adjustment validation error for user {user_id}: {e}')
+        return jsonify({'error': 'Operación de saldo inválida'}), 400
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f'Balance adjustment failed: {e}')
@@ -1748,9 +1789,8 @@ def create_backup():
                 return redirect(url_for('admin.backup_dashboard'))
                 
     except Exception as e:
-        error_msg = f'❌ Error inesperado al crear backup: {str(e)}'
-        current_app.logger.error(error_msg)
-        
+        current_app.logger.error(f'Error inesperado al crear backup: {e}')
+        error_msg = 'Error inesperado al crear backup'
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return jsonify({'error': error_msg}), 500
         else:
@@ -1827,9 +1867,8 @@ def delete_backup(filename):
             return redirect(url_for('admin.backup_dashboard'))
             
     except Exception as e:
-        error_msg = f'❌ Error al eliminar backup: {str(e)}'
-        current_app.logger.error(error_msg)
-        
+        current_app.logger.error(f'Error al eliminar backup: {e}')
+        error_msg = 'Error al eliminar backup'
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return jsonify({'error': error_msg}), 500
         else:

@@ -348,7 +348,7 @@
                     <div class="form-group">
                         <label for="adminEmail">Email del Administrador:</label>
                         <input type="email" class="form-control" id="adminEmail"
-                               value="{{ current_user.email or '' }}" required>
+                               value="{{ current_user.email or '' }}" maxlength="254" required>
                     </div>
                     <div class="alert alert-info">
                         <strong>Se enviaran:</strong>

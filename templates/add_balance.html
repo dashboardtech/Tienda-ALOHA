@@ -18,13 +18,14 @@
                         <input type="number" 
                                id="amount" 
                                name="amount" 
-                               step="0.01" 
-                               min="0.01" 
+                               step="0.01"
+                               min="0.01"
+                               max="9999.99"
                                required>
                     </div>
                 </div>
                 <div class="form-actions">
-                    <button type="submit" class="action-button primary">
+                    <button type="submit" class="action-button primary" id="addBalanceBtn">
                         <span class="icon">💰</span>
                         Agregar Balance
                     </button>
@@ -153,4 +154,12 @@
     font-size: 1.2rem;
 }
 </style>
+
+<script>
+document.querySelector('.balance-form').addEventListener('submit', function() {
+    var btn = document.getElementById('addBalanceBtn');
+    btn.disabled = true;
+    btn.textContent = 'Procesando...';
+});
+</script>
 {% endblock %}

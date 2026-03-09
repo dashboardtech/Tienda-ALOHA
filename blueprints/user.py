@@ -16,6 +16,7 @@ from app.models import Toy, Order, OrderItem, User, Center
 from app.extensions import db
 from app.filters import format_currency
 from app.security import validate_password_strength
+from app.balance import atomic_add_balance, is_duplicate_operation
 
 # Crear el blueprint de usuario
 user_bp = Blueprint('user', __name__, url_prefix='/user')
@@ -56,12 +57,17 @@ def add_balance():
             return jsonify({'success': False, 'message': 'Usuario no encontrado'}), 404
 
         amount = Decimal(request.form.get('amount', '0'))
-        if amount <= 0:
-            return jsonify({'success': False, 'message': 'Cantidad inválida'}), 400
+        if amount <= 0 or amount > Decimal('9999.99'):
+            return jsonify({'success': False, 'message': 'Cantidad inválida (debe ser entre 0.01 y 9999.99)'}), 400
+        if amount != amount.quantize(Decimal('0.01')):
+            return jsonify({'success': False, 'message': 'Máximo 2 decimales permitidos'}), 400
 
-        target_user.balance += amount
+        if is_duplicate_operation(target_user.id, amount, 'add_balance'):
+            return jsonify({'success': False, 'message': 'Operación duplicada detectada. Espera unos segundos.'}), 409
+
+        target_user = atomic_add_balance(target_user.id, amount)
         db.session.commit()
-        
+
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return jsonify({
                 'success': True,

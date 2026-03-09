@@ -295,12 +295,13 @@
                     <h2 class="text-center mb-4 text-dark">🔍 Busqueda Avanzada de Juguetes</h2>
                     <form id="searchForm" method="GET">
                         <div class="input-group position-relative">
-                            <input type="text" 
-                                   class="form-control search-input" 
-                                   name="query" 
+                            <input type="text"
+                                   class="form-control search-input"
+                                   name="query"
                                    id="searchInput"
-                                   value="{{ current_query }}" 
+                                   value="{{ current_query }}"
                                    placeholder="Buscar juguetes por nombre, categoría o descripción..."
+                                   maxlength="100"
                                    autocomplete="off">
                             <div class="input-group-append">
                                 <button class="btn btn-primary search-btn" type="submit">
@@ -375,18 +376,24 @@
                     <div class="filter-title">Rango de Precio</div>
                     <div class="row">
                         <div class="col-6">
-                            <input type="number" 
-                                   class="form-control form-control-sm" 
-                                   name="price_min" 
+                            <input type="number"
+                                   class="form-control form-control-sm"
+                                   name="price_min"
                                    placeholder="Min"
+                                   min="0"
+                                   max="9999.99"
+                                   step="0.01"
                                    value="{{ current_filters.price_min or '' }}"
                                    onchange="applyPriceFilter()">
                         </div>
                         <div class="col-6">
-                            <input type="number" 
-                                   class="form-control form-control-sm" 
-                                   name="price_max" 
+                            <input type="number"
+                                   class="form-control form-control-sm"
+                                   name="price_max"
                                    placeholder="Max"
+                                   min="0"
+                                   max="9999.99"
+                                   step="0.01"
                                    value="{{ current_filters.price_max or '' }}"
                                    onchange="applyPriceFilter()">
                         </div>

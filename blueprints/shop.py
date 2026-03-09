@@ -25,6 +25,7 @@ from sqlalchemy.orm import selectinload
 from app.filters import format_currency
 from pagination_helpers import PaginationHelper, paginate_query
 from app.utils import collect_center_choices, normalize_center_slug
+from sqlalchemy import text
 
 # Importar sistemas avanzados
 try:
@@ -152,19 +153,22 @@ def advanced_search():
         )
         
     except Exception as e:
-        flash(f'Error en bÃºsqueda avanzada: {str(e)}', 'error')
+        current_app.logger.error(f'Error en búsqueda avanzada: {e}')
+        flash('Error en la búsqueda. Intenta de nuevo.', 'error')
         return basic_search()
 
 def basic_search():
     """BÃºsqueda bÃ¡sica (fallback)"""
     # Sanitize query: remove LIKE wildcards to prevent unintended matching
     raw_query = request.args.get('query', '') or ''
-    query = raw_query.strip().replace('%', '').replace('_', '')
+    query = raw_query.strip().replace('%', '').replace('_', '')[:200]
     toy_type = (request.args.get('toy_type') or request.args.get('category') or '').strip()
     # New filters
     age = request.args.get('age') or request.args.get('age_range') or ''
     gender = request.args.get('gender', '')
     sort = request.args.get('sort', 'name')
+    if sort not in ('name', 'price_asc', 'price_desc', 'newest'):
+        sort = 'name'
     center_slug = request.args.get('center', '')
     normalized_center = normalize_center_slug(center_slug)
     center_choices = []
@@ -260,7 +264,7 @@ def search_suggestions():
     if not ADVANCED_SYSTEMS_AVAILABLE:
         return jsonify([])
     
-    query = request.args.get('q', '').strip()
+    query = request.args.get('q', '').strip()[:200]
     if len(query) < 2:
         return jsonify([])
     
@@ -652,8 +656,17 @@ def checkout():
                 db.session.add(order_item)
                 toy.stock -= qty
 
-            # Deduct from locked user row
-            user.balance -= actual_total
+            # Atomic deduction with negative-balance guard
+            result = db.session.execute(
+                text(
+                    "UPDATE user SET balance = balance - :amt "
+                    "WHERE id = :uid AND balance >= :amt"
+                ),
+                {"amt": float(actual_total), "uid": user.id},
+            )
+            if result.rowcount == 0:
+                raise Exception("No tienes suficientes ALOHA Dollars")
+            db.session.refresh(user)
 
             db.session.commit()
 

@@ -20,8 +20,9 @@
                 <input type="text" 
                        id="name" 
                        name="name" 
-                       value="{{ toy.name }}" 
+                       value="{{ toy.name }}"
                        required
+                       maxlength="150"
                        placeholder="Nombre del juguete">
             </div>
 
@@ -43,9 +44,10 @@
                     <span class="icon">📄</span>
                     Descripción
                 </label>
-                <textarea id="description" 
-                          name="description" 
+                <textarea id="description"
+                          name="description"
                           required
+                          maxlength="500"
                           placeholder="Describe el juguete"
                           rows="4">{{ toy.description }}</textarea>
             </div>
@@ -58,8 +60,10 @@
                 <input type="number" 
                        id="price" 
                        name="price" 
-                       value="{{ toy.price }}" 
-                       step="0.01" 
+                       value="{{ toy.price }}"
+                       step="0.01"
+                       min="0.01"
+                       max="9999.99"
                        required
                        placeholder="0.00">
             </div>
@@ -84,7 +88,7 @@
             </div>
 
             <div class="action-buttons">
-                <button type="submit" class="auth-button">
+                <button type="submit" class="auth-button" id="saveEditBtn">
                     ✨ Guardar Cambios
                 </button>
                 <a href="{{ url_for('admin.dashboard') }}" class="back-button">
@@ -166,4 +170,12 @@ textarea:focus {
     }
 }
 </style>
+
+<script>
+document.querySelector('form').addEventListener('submit', function() {
+    var btn = document.getElementById('saveEditBtn');
+    btn.disabled = true;
+    btn.textContent = 'Procesando...';
+});
+</script>
 {% endblock %}
